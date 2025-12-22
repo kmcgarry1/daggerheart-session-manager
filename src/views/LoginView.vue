@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/authStore";
 import UiButton from "../components/ui/UiButton.vue";
@@ -20,6 +20,30 @@ const router = useRouter();
 
 const email = ref("");
 const password = ref("");
+
+const diagnostics = computed(() => {
+  if (typeof window === "undefined") {
+    return {
+      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "unknown",
+      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "unknown",
+      origin: "unavailable",
+      prefersRedirect: false,
+      userAgent: "unavailable",
+    };
+  }
+
+  const prefersRedirect =
+    window.matchMedia("(max-width: 720px)").matches ||
+    window.matchMedia("(pointer: coarse)").matches;
+
+  return {
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? "unknown",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? "unknown",
+    origin: window.location.origin,
+    prefersRedirect,
+    userAgent: window.navigator.userAgent,
+  };
+});
 
 const handleEmailSignIn = async () => {
   await authStore.signInWithEmail(email.value, password.value);
@@ -100,6 +124,31 @@ watch(
         <span>New here?</span>
         <router-link to="/signup">Create an account</router-link>
       </div>
+      <details class="auth-debug">
+        <summary>Auth diagnostics</summary>
+        <div class="auth-debug-grid">
+          <div>
+            <span class="meta">authDomain</span>
+            <strong>{{ diagnostics.authDomain }}</strong>
+          </div>
+          <div>
+            <span class="meta">projectId</span>
+            <strong>{{ diagnostics.projectId }}</strong>
+          </div>
+          <div>
+            <span class="meta">origin</span>
+            <strong>{{ diagnostics.origin }}</strong>
+          </div>
+          <div>
+            <span class="meta">prefersRedirect</span>
+            <strong>{{ diagnostics.prefersRedirect ? "true" : "false" }}</strong>
+          </div>
+        </div>
+        <div>
+          <span class="meta">user agent</span>
+          <p class="auth-debug-ua">{{ diagnostics.userAgent }}</p>
+        </div>
+      </details>
     </UiCard>
     <section class="auth-aside">
       <UiCard variant="lore">
