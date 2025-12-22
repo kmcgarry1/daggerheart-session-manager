@@ -133,6 +133,21 @@ const sendRequest = async (inviteCode: string) => {
     if (profileMatch.uid === authStore.currentUser.value.uid) {
       throw new Error("You can't add yourself.");
     }
+    const existing = friendships.value.find((friendship) =>
+      friendship.users.includes(profileMatch.uid),
+    );
+    if (existing) {
+      if (existing.status === "accepted") {
+        throw new Error("You're already friends.");
+      }
+      if (existing.status === "pending") {
+        if (existing.requesterUid === authStore.currentUser.value.uid) {
+          throw new Error("Friend request already sent.");
+        }
+        throw new Error("They already sent you a friend request.");
+      }
+      throw new Error("That request was closed. Ask them to send a new one.");
+    }
 
     await sendFriendRequest({
       fromUid: authStore.currentUser.value.uid,
