@@ -2,7 +2,6 @@ import {
   Timestamp,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -72,21 +71,6 @@ export const sendFriendRequest = async ({
 }) => {
   const friendshipId = getFriendshipId(fromUid, toUid);
   const ref = doc(db, "friendships", friendshipId);
-  const snapshot = await getDoc(ref);
-
-  if (snapshot.exists()) {
-    const existing = snapshot.data() as FriendshipDoc;
-    if (existing.status === "accepted") {
-      throw new Error("You're already friends.");
-    }
-    if (existing.status === "pending") {
-      if (existing.requesterUid === fromUid) {
-        throw new Error("Friend request already sent.");
-      }
-      throw new Error("They already sent you a friend request.");
-    }
-    throw new Error("That request was closed. Ask them to send a new one.");
-  }
 
   const payload: FriendshipDoc = {
     users: [fromUid, toUid].sort() as [string, string],

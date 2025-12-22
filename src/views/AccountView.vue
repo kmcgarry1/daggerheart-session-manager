@@ -297,7 +297,11 @@ const getInitials = (name: string) =>
               required
             />
           </UiField>
-          <UiButton variant="primary" type="submit" :disabled="friendStore.sending.value">
+          <UiButton
+            variant="primary"
+            type="submit"
+            :disabled="friendStore.sending.value || friendStore.loading.value"
+          >
             {{ friendStore.sending.value ? "Sending..." : "Send friend request" }}
           </UiButton>
           <p v-if="friendStore.sendError.value" class="error">
