@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import IconFlame from "./icons/IconFlame.vue";
 
 const props = defineProps<{
   value: number;
@@ -26,27 +27,43 @@ const increment = () => emit("set", clampedValue.value + 1);
 </script>
 
 <template>
-  <aside class="fear-panel" :class="{ minimized }">
-    <div class="fear-header">
-      <div>
-        <span class="meta-label">Fear tracker</span>
-        <strong>{{ clampedValue }}</strong>
+  <section class="fear-altar" :class="{ minimized }">
+    <header class="fear-header">
+      <div class="panel-title">
+        <span class="icon ember"><IconFlame /></span>
+        <div>
+          <p class="eyebrow">Fear tracker</p>
+          <h2>Fear commands the table</h2>
+        </div>
       </div>
-      <button class="btn secondary compact" type="button" @click="emit('toggle')">
+      <button class="btn ghost compact" type="button" @click="emit('toggle')">
         {{ minimized ? "Expand" : "Minimize" }}
       </button>
-    </div>
+    </header>
 
     <div v-if="!minimized" class="fear-body">
-      <div class="fear-dots">
+      <div
+        class="fear-dial"
+        :style="{
+          '--count': levels.length,
+          '--radius': '120px',
+          '--dot-size': '36px',
+        }"
+      >
+        <div class="fear-core">
+          <span class="meta">Current fear</span>
+          <strong>{{ clampedValue }}</strong>
+          <span class="meta">/ {{ maxValue }}</span>
+        </div>
         <button
           v-for="level in levels"
           :key="level"
-          class="fear-dot"
+          class="fear-marker"
           :class="{
             'is-filled': level <= clampedValue,
             'is-active': level === clampedValue,
           }"
+          :style="{ '--i': level }"
           type="button"
           :disabled="!canEdit"
           :aria-label="`Set fear to ${level}`"
@@ -57,9 +74,13 @@ const increment = () => emit("set", clampedValue.value + 1);
       </div>
 
       <div v-if="canEdit" class="fear-controls">
-        <button class="btn ghost" type="button" @click="decrement">-1</button>
-        <button class="btn ghost" type="button" @click="increment">+1</button>
+        <button class="btn subtle" type="button" @click="decrement">
+          Lower
+        </button>
+        <button class="btn primary" type="button" @click="increment">
+          Raise
+        </button>
       </div>
     </div>
-  </aside>
+  </section>
 </template>

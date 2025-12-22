@@ -40,7 +40,7 @@ const increment = () => emit("set", clampValue(props.countdown.value + 1));
   <div class="countdown-card">
     <div class="countdown-header">
       <div>
-        <span class="meta-label">Countdown</span>
+        <p class="eyebrow">Countdown</p>
         <h3>{{ countdown.name || "Countdown" }}</h3>
       </div>
       <button
@@ -84,7 +84,7 @@ const increment = () => emit("set", clampValue(props.countdown.value + 1));
     </div>
 
     <div class="countdown-footer">
-      <span class="meta-label">Max {{ countdown.max }}</span>
+      <span class="meta">Max {{ countdown.max }}</span>
       <div v-if="canEdit" class="countdown-controls">
         <button class="btn ghost" type="button" @click="decrement">-1</button>
         <button class="btn ghost" type="button" @click="increment">+1</button>

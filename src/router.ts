@@ -1,0 +1,40 @@
+import { createRouter, createWebHistory } from "vue-router";
+import WelcomeView from "./views/WelcomeView.vue";
+import LoginView from "./views/LoginView.vue";
+import CreateView from "./views/CreateView.vue";
+import JoinView from "./views/JoinView.vue";
+import SessionView from "./views/SessionView.vue";
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: "/",
+      name: "welcome",
+      component: WelcomeView,
+    },
+    {
+      path: "/login",
+      name: "login",
+      component: LoginView,
+      meta: { hideNav: true },
+    },
+    {
+      path: "/create",
+      name: "create",
+      component: CreateView,
+    },
+    {
+      path: "/join",
+      name: "join",
+      component: JoinView,
+    },
+    {
+      path: "/session/:sessionId",
+      name: "session",
+      component: SessionView,
+    },
+  ],
+});
+
+export default router;
