@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
+import { Analytics } from "@vercel/analytics/vue";
 import { useAuthStore } from "./stores/authStore";
 import { useSessionStore } from "./stores/sessionStore";
 
@@ -69,5 +70,6 @@ const goToSession = () => {
     </header>
 
     <router-view />
+    <Analytics />
   </div>
 </template>
