@@ -2,6 +2,7 @@ import { computed, ref } from "vue";
 import { getRedirectResult, onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../firebase";
 import {
+  consumeRedirectAttempt,
   signInWithEmail,
   signInWithGoogle,
   signOutUser,
@@ -65,6 +66,12 @@ const resolveAuthError = (error: unknown, fallback: string) => {
       return "This domain is not authorized for sign-in.";
     case "auth/web-storage-unsupported":
       return "Browser storage is blocked. Disable private mode or allow cookies.";
+    case "auth/popup-blocked":
+      return "Popup was blocked. Allow popups or try again.";
+    case "auth/popup-closed-by-user":
+      return "Popup was closed before sign-in completed.";
+    case "auth/redirect-cancelled":
+      return "Sign-in didn't complete. Try Safari or allow cookies.";
     default:
       return fallback;
   }
@@ -100,10 +107,20 @@ const init = () => {
   initialized = true;
   authErrorCode.value = null;
   authError.value = null;
-  getRedirectResult(auth).catch((error) => {
-    console.error(error);
-    setAuthError(error, "Sign-in failed. Please try again.");
-  });
+  getRedirectResult(auth)
+    .then((result) => {
+      if (!result?.user && consumeRedirectAttempt()) {
+        authErrorCode.value = "auth/redirect-cancelled";
+        authError.value = resolveAuthError(
+          { code: "auth/redirect-cancelled" },
+          "Sign-in didn't complete. Please try again.",
+        );
+      }
+    })
+    .catch((error) => {
+      console.error(error);
+      setAuthError(error, "Sign-in failed. Please try again.");
+    });
   authUnsubscribe = onAuthStateChanged(auth, async (user) => {
     currentUser.value = user;
     authReady.value = true;

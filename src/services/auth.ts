@@ -10,16 +10,31 @@ import {
 } from "firebase/auth";
 import { auth } from "../firebase";
 
+const REDIRECT_KEY = "dh_auth_redirect";
+
 const prefersRedirect = () =>
   window.matchMedia("(max-width: 720px)").matches ||
   window.matchMedia("(pointer: coarse)").matches;
 
-const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) => {
-  if (prefersRedirect()) {
-    await signInWithRedirect(auth, provider);
-    return;
+const setRedirectAttempt = () => {
+  try {
+    sessionStorage.setItem(REDIRECT_KEY, "1");
+  } catch {
+    // Ignore storage failures.
   }
+};
 
+export const consumeRedirectAttempt = () => {
+  try {
+    const value = sessionStorage.getItem(REDIRECT_KEY);
+    sessionStorage.removeItem(REDIRECT_KEY);
+    return value === "1";
+  } catch {
+    return false;
+  }
+};
+
+const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) => {
   try {
     await signInWithPopup(auth, provider);
   } catch (error) {
@@ -29,6 +44,10 @@ const signInWithProvider = async (provider: GoogleAuthProvider | OAuthProvider) 
       authError.code === "auth/popup-closed-by-user" ||
       authError.code === "auth/operation-not-supported-in-this-environment"
     ) {
+      if (!prefersRedirect()) {
+        throw error;
+      }
+      setRedirectAttempt();
       await signInWithRedirect(auth, provider);
       return;
     }
