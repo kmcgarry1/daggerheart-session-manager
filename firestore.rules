@@ -1,0 +1,100 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function sessionDoc(sessionId) {
+      return get(/databases/$(database)/documents/sessions/$(sessionId));
+    }
+
+    function sessionExists(sessionId) {
+      return exists(/databases/$(database)/documents/sessions/$(sessionId));
+    }
+
+    function sessionActive(sessionId) {
+      return sessionExists(sessionId) &&
+        sessionDoc(sessionId).data.sessionExpiresAt > request.time;
+    }
+
+    function validSession(data) {
+      return data.code is string &&
+        data.code.size() == 6 &&
+        (data.name == null || data.name is string) &&
+        data.host is map &&
+        data.host.name is string &&
+        data.host.memberId is string &&
+        (data.host.uid == null || data.host.uid is string) &&
+        data.host.isGuest is bool &&
+        data.fear is int &&
+        data.fear >= 0 &&
+        data.fear <= 12 &&
+        data.codeExpiresAt is timestamp &&
+        data.codeExpiresAt > request.time &&
+        data.sessionExpiresAt is timestamp &&
+        data.sessionExpiresAt > request.time;
+    }
+
+    function validMember(data) {
+      return data.name is string &&
+        data.name.size() > 0 &&
+        data.isGuest is bool &&
+        (data.uid == null || data.uid is string) &&
+        data.role in ["host", "player"];
+    }
+
+    function validCountdown(data) {
+      return data.name is string &&
+        data.name.size() > 0 &&
+        data.max is int &&
+        data.max >= 1 &&
+        data.value is int &&
+        data.value >= 0 &&
+        data.value <= data.max;
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if true;
+      allow create: if validSession(request.resource.data);
+      allow update: if sessionActive(sessionId) &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.name == resource.data.name &&
+        request.resource.data.host == resource.data.host &&
+        request.resource.data.codeExpiresAt == resource.data.codeExpiresAt &&
+        request.resource.data.sessionExpiresAt == resource.data.sessionExpiresAt &&
+        request.resource.data.fear is int &&
+        request.resource.data.fear >= 0 &&
+        request.resource.data.fear <= 12;
+      allow delete: if false;
+    }
+
+    match /sessions/{sessionId}/members/{memberId} {
+      allow read: if true;
+      allow create: if sessionActive(sessionId) && validMember(request.resource.data);
+      allow update: if sessionActive(sessionId) &&
+        validMember(request.resource.data) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.uid == resource.data.uid;
+      allow delete: if false;
+    }
+
+    match /sessions/{sessionId}/countdowns/{countdownId} {
+      allow read: if true;
+      allow create: if sessionActive(sessionId) && validCountdown(request.resource.data);
+      allow update: if sessionActive(sessionId) &&
+        validCountdown(request.resource.data) &&
+        request.resource.data.name == resource.data.name &&
+        request.resource.data.max == resource.data.max;
+      allow delete: if sessionActive(sessionId);
+    }
+
+    match /users/{uid} {
+      allow read, write: if isAuthed() && request.auth.uid == uid;
+
+      match /sessions/{sessionId} {
+        allow read, write: if isAuthed() && request.auth.uid == uid;
+      }
+    }
+  }
+}
