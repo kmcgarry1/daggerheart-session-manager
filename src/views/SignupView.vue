@@ -39,9 +39,10 @@ watch(
   () => authStore.currentUser.value,
   (user) => {
     if (user) {
-      router.push("/account");
+      router.replace("/account");
     }
   },
+  { immediate: true },
 );
 </script>
 

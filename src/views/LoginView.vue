@@ -29,6 +29,8 @@ const diagnostics = computed(() => {
       origin: "unavailable",
       prefersRedirect: false,
       userAgent: "unavailable",
+      authReady: authStore.authReady.value,
+      currentUid: authStore.currentUser.value?.uid ?? "none",
     };
   }
 
@@ -42,6 +44,8 @@ const diagnostics = computed(() => {
     origin: window.location.origin,
     prefersRedirect,
     userAgent: window.navigator.userAgent,
+    authReady: authStore.authReady.value,
+    currentUid: authStore.currentUser.value?.uid ?? "none",
   };
 });
 
@@ -53,9 +57,10 @@ watch(
   () => authStore.currentUser.value,
   (user) => {
     if (user) {
-      router.push("/account");
+      router.replace("/account");
     }
   },
+  { immediate: true },
 );
 </script>
 
@@ -142,6 +147,14 @@ watch(
           <div>
             <span class="meta">prefersRedirect</span>
             <strong>{{ diagnostics.prefersRedirect ? "true" : "false" }}</strong>
+          </div>
+          <div>
+            <span class="meta">authReady</span>
+            <strong>{{ diagnostics.authReady ? "true" : "false" }}</strong>
+          </div>
+          <div>
+            <span class="meta">currentUid</span>
+            <strong>{{ diagnostics.currentUid }}</strong>
           </div>
         </div>
         <div>
