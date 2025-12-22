@@ -31,6 +31,8 @@ const diagnostics = computed(() => {
       userAgent: "unavailable",
       authReady: authStore.authReady.value,
       currentUid: authStore.currentUser.value?.uid ?? "none",
+      authError: authStore.authError.value ?? "none",
+      authErrorCode: authStore.authErrorCode.value ?? "none",
     };
   }
 
@@ -46,6 +48,8 @@ const diagnostics = computed(() => {
     userAgent: window.navigator.userAgent,
     authReady: authStore.authReady.value,
     currentUid: authStore.currentUser.value?.uid ?? "none",
+    authError: authStore.authError.value ?? "none",
+    authErrorCode: authStore.authErrorCode.value ?? "none",
   };
 });
 
@@ -156,6 +160,14 @@ watch(
             <span class="meta">currentUid</span>
             <strong>{{ diagnostics.currentUid }}</strong>
           </div>
+          <div>
+            <span class="meta">authErrorCode</span>
+            <strong>{{ diagnostics.authErrorCode }}</strong>
+          </div>
+        </div>
+        <div>
+          <span class="meta">authError</span>
+          <p class="auth-debug-ua">{{ diagnostics.authError }}</p>
         </div>
         <div>
           <span class="meta">user agent</span>

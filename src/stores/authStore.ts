@@ -1,5 +1,5 @@
 import { computed, ref } from "vue";
-import { onAuthStateChanged, type User } from "firebase/auth";
+import { getRedirectResult, onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../firebase";
 import {
   signInWithEmail,
@@ -18,6 +18,7 @@ import { getGuestIdentity, getMemberId, setGuestName } from "../services/guests"
 const authReady = ref(false);
 const authBusy = ref(false);
 const authError = ref<string | null>(null);
+const authErrorCode = ref<string | null>(null);
 const currentUser = ref<User | null>(null);
 const guestIdentity = ref(getGuestIdentity());
 const savedSessions = ref<UserSessionRecord[]>([]);
@@ -60,9 +61,18 @@ const resolveAuthError = (error: unknown, fallback: string) => {
       return "Too many attempts. Try again later.";
     case "auth/operation-not-allowed":
       return "Email/password sign-in is not enabled for this project.";
+    case "auth/unauthorized-domain":
+      return "This domain is not authorized for sign-in.";
+    case "auth/web-storage-unsupported":
+      return "Browser storage is blocked. Disable private mode or allow cookies.";
     default:
       return fallback;
   }
+};
+
+const setAuthError = (error: unknown, fallback: string) => {
+  authErrorCode.value = (error as { code?: string }).code ?? null;
+  authError.value = resolveAuthError(error, fallback);
 };
 
 const refreshSavedSessions = async () => {
@@ -88,6 +98,12 @@ const init = () => {
     return;
   }
   initialized = true;
+  authErrorCode.value = null;
+  authError.value = null;
+  getRedirectResult(auth).catch((error) => {
+    console.error(error);
+    setAuthError(error, "Sign-in failed. Please try again.");
+  });
   authUnsubscribe = onAuthStateChanged(auth, async (user) => {
     currentUser.value = user;
     authReady.value = true;
@@ -108,14 +124,12 @@ const init = () => {
 const signIn = async () => {
   authBusy.value = true;
   authError.value = null;
+  authErrorCode.value = null;
   try {
     await signInWithGoogle();
   } catch (error) {
     console.error(error);
-    authError.value = resolveAuthError(
-      error,
-      "Sign-in failed. Please try again.",
-    );
+    setAuthError(error, "Sign-in failed. Please try again.");
   } finally {
     authBusy.value = false;
   }
@@ -124,14 +138,12 @@ const signIn = async () => {
 const signInWithEmailAddress = async (email: string, password: string) => {
   authBusy.value = true;
   authError.value = null;
+  authErrorCode.value = null;
   try {
     await signInWithEmail(email, password);
   } catch (error) {
     console.error(error);
-    authError.value = resolveAuthError(
-      error,
-      "Email sign-in failed. Please try again.",
-    );
+    setAuthError(error, "Email sign-in failed. Please try again.");
   } finally {
     authBusy.value = false;
   }
@@ -148,15 +160,13 @@ const signUpWithEmailAddress = async ({
 }) => {
   authBusy.value = true;
   authError.value = null;
+  authErrorCode.value = null;
   try {
     const user = await signUpWithEmail({ displayName: name, email, password });
     await ensureUserProfile(user);
   } catch (error) {
     console.error(error);
-    authError.value = resolveAuthError(
-      error,
-      "Account creation failed. Please try again.",
-    );
+    setAuthError(error, "Account creation failed. Please try again.");
   } finally {
     authBusy.value = false;
   }
@@ -165,11 +175,12 @@ const signUpWithEmailAddress = async ({
 const signOut = async () => {
   authBusy.value = true;
   authError.value = null;
+  authErrorCode.value = null;
   try {
     await signOutUser();
   } catch (error) {
     console.error(error);
-    authError.value = "Sign-out failed. Please try again.";
+    setAuthError(error, "Sign-out failed. Please try again.");
   } finally {
     authBusy.value = false;
   }
@@ -228,6 +239,7 @@ export const useAuthStore = () => ({
   authReady,
   authBusy,
   authError,
+  authErrorCode,
   currentUser,
   guestIdentity,
   savedSessions,
