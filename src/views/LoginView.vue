@@ -1,9 +1,14 @@
 <script setup lang="ts">
+import { ref, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useAuthStore } from "../stores/authStore";
 import UiButton from "../components/ui/UiButton.vue";
 import UiCard from "../components/ui/UiCard.vue";
+import UiField from "../components/ui/UiField.vue";
+import UiInput from "../components/ui/UiInput.vue";
 import {
   LogIn,
+  Mail,
   ScrollText,
   Shield,
   Sparkles,
@@ -11,6 +16,23 @@ import {
 } from "lucide-vue-next";
 
 const authStore = useAuthStore();
+const router = useRouter();
+
+const email = ref("");
+const password = ref("");
+
+const handleEmailSignIn = async () => {
+  await authStore.signInWithEmail(email.value, password.value);
+};
+
+watch(
+  () => authStore.currentUser.value,
+  (user) => {
+    if (user) {
+      router.push("/account");
+    }
+  },
+);
 </script>
 
 <template>
@@ -37,12 +59,47 @@ const authStore = useAuthStore();
         <span class="icon"><LogIn /></span>
         Sign in with Google
       </UiButton>
+      <div class="auth-divider">Or sign in with email</div>
+      <form class="panel-form auth-form" @submit.prevent="handleEmailSignIn">
+        <UiField label="Email" id="login-email">
+          <UiInput
+            id="login-email"
+            v-model="email"
+            type="email"
+            placeholder="you@example.com"
+            autocomplete="email"
+            required
+          />
+        </UiField>
+        <UiField label="Password" id="login-password">
+          <UiInput
+            id="login-password"
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </UiField>
+        <UiButton
+          variant="ghost"
+          full
+          type="submit"
+          :disabled="authStore.authBusy.value"
+        >
+          <span class="icon"><Mail /></span>
+          Sign in with email
+        </UiButton>
+      </form>
       <UiButton variant="ghost" full to="/create">
         Continue as guest
       </UiButton>
       <p v-if="authStore.authError.value" class="error">
         {{ authStore.authError.value }}
       </p>
+      <div class="auth-links">
+        <span>New here?</span>
+        <router-link to="/signup">Create an account</router-link>
+      </div>
     </UiCard>
     <section class="auth-aside">
       <UiCard variant="lore">

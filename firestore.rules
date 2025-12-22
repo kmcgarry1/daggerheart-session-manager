@@ -18,6 +18,10 @@ service cloud.firestore {
         sessionDoc(sessionId).data.sessionExpiresAt > request.time;
     }
 
+    function isTimestamp(value) {
+      return value is timestamp || value == request.time;
+    }
+
     function validSession(data) {
       return data.code is string &&
         data.code.size() == 6 &&
@@ -64,8 +68,8 @@ service cloud.firestore {
         (data.sessionExpiresAt == null || data.sessionExpiresAt is timestamp) &&
         (data.message == null || data.message is string) &&
         data.status in ["pending", "accepted", "declined", "revoked"] &&
-        data.createdAt is timestamp &&
-        data.updatedAt is timestamp;
+        isTimestamp(data.createdAt) &&
+        isTimestamp(data.updatedAt);
     }
 
     function validFriendship(data) {
@@ -80,8 +84,8 @@ service cloud.firestore {
         data.addresseeName is string &&
         (data.addresseePhotoURL == null || data.addresseePhotoURL is string) &&
         data.status in ["pending", "accepted", "declined", "cancelled"] &&
-        data.createdAt is timestamp &&
-        data.updatedAt is timestamp;
+        isTimestamp(data.createdAt) &&
+        isTimestamp(data.updatedAt);
     }
 
     match /sessions/{sessionId} {

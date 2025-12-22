@@ -1180,6 +1180,58 @@ h3 {
   box-shadow: 0 24px 45px rgba(7, 9, 12, 0.55);
 }
 
+.auth-form {
+  display: grid;
+  gap: 14px;
+}
+
+.auth-divider {
+  position: relative;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin: 6px 0 2px;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 35%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--border-card-strong),
+    transparent
+  );
+}
+
+.auth-divider::before {
+  left: 0;
+}
+
+.auth-divider::after {
+  right: 0;
+}
+
+.auth-links {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.auth-links a {
+  color: var(--color-gild);
+  font-weight: 600;
+}
+
 .auth-note {
   display: inline-flex;
   align-items: center;
