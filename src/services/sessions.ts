@@ -229,6 +229,9 @@ export const findSessionByCode = async (code: string) => {
   }
 
   const docSnap = snapshot.docs[0];
+  if (!docSnap) {
+    return null;
+  }
   return mapSessionData(docSnap.id, docSnap.data() as SessionDoc);
 };
 

@@ -1,14 +1,28 @@
 const GUEST_ID_KEY = "dh_guest_id";
 const GUEST_NAME_KEY = "dh_guest_name";
 
+type CryptoLike = {
+  randomUUID?: () => string;
+  getRandomValues?: (array: Uint8Array) => Uint8Array;
+};
+
+const getCrypto = (): CryptoLike | null => {
+  if (typeof globalThis === "undefined") {
+    return null;
+  }
+  const cryptoRef = (globalThis as { crypto?: CryptoLike }).crypto;
+  return cryptoRef ?? null;
+};
+
 const generateGuestId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
+  const cryptoRef = getCrypto();
+  if (cryptoRef?.randomUUID) {
+    return cryptoRef.randomUUID();
   }
 
   const bytes = new Uint8Array(16);
-  if (typeof crypto !== "undefined" && "getRandomValues" in crypto) {
-    crypto.getRandomValues(bytes);
+  if (cryptoRef?.getRandomValues) {
+    cryptoRef.getRandomValues(bytes);
   } else {
     for (let i = 0; i < bytes.length; i += 1) {
       bytes[i] = Math.floor(Math.random() * 256);

@@ -67,14 +67,16 @@ const memberId = computed(() =>
   getMemberId(currentUser.value?.uid ?? null, guestIdentity.value.id),
 );
 
-const displayName = computed(() => {
-  if (currentUser.value?.displayName) {
-    return currentUser.value.displayName;
+const displayName = computed<string>(() => {
+  const name = currentUser.value?.displayName;
+  if (typeof name === "string" && name.trim()) {
+    return name;
   }
-  if (currentUser.value?.email) {
-    return currentUser.value.email.split("@")[0];
+  const email = currentUser.value?.email;
+  if (typeof email === "string" && email.includes("@")) {
+    return email.split("@")[0] ?? email;
   }
-  return guestIdentity.value.name;
+  return guestIdentity.value.name.trim() || "Player";
 });
 
 const canCreate = computed(() => hostName.value.trim().length > 0 && !creating.value);
@@ -464,11 +466,12 @@ const handleAddCountdown = async () => {
 
   try {
     countdownError.value = null;
+    const creatorName = hostName.value.trim() || displayName.value;
     await addCountdown(activeSessionId.value, {
       name: trimmedName,
       max: countdownMax.value,
       createdBy: {
-        name: hostName.value || displayName.value,
+        name: creatorName,
         uid: currentUser.value?.uid ?? null,
         memberId: memberId.value,
         isGuest: !currentUser.value,
