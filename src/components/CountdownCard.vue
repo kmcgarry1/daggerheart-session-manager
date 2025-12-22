@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Hourglass, Trash2 } from "lucide-vue-next";
+import UiButton from "./ui/UiButton.vue";
+import UiCard from "./ui/UiCard.vue";
 import type { CountdownData } from "../services/sessions";
 
 const props = defineProps<{
@@ -37,20 +40,26 @@ const increment = () => emit("set", clampValue(props.countdown.value + 1));
 </script>
 
 <template>
-  <div class="countdown-card">
+  <UiCard variant="countdown">
     <div class="countdown-header">
-      <div>
-        <p class="eyebrow">Countdown</p>
-        <h3>{{ countdown.name || "Countdown" }}</h3>
+      <div class="countdown-title">
+        <span class="icon ember"><Hourglass /></span>
+        <div>
+          <p class="eyebrow">Countdown</p>
+          <h3>{{ countdown.name || "Countdown" }}</h3>
+        </div>
       </div>
-      <button
+      <UiButton
         v-if="canEdit"
-        class="btn ghost"
+        variant="ghost"
+        size="compact"
+        danger
         type="button"
         @click="emit('remove')"
       >
-        Remove
-      </button>
+        <span class="icon"><Trash2 /></span>
+        Dispel
+      </UiButton>
     </div>
 
     <div
@@ -84,11 +93,18 @@ const increment = () => emit("set", clampValue(props.countdown.value + 1));
     </div>
 
     <div class="countdown-footer">
-      <span class="meta">Max {{ countdown.max }}</span>
+      <div class="countdown-meta">
+        <span class="meta">Max {{ countdown.max }}</span>
+        <span class="meta">Current {{ countdown.value }}</span>
+      </div>
       <div v-if="canEdit" class="countdown-controls">
-        <button class="btn ghost" type="button" @click="decrement">-1</button>
-        <button class="btn ghost" type="button" @click="increment">+1</button>
+        <UiButton variant="ghost" size="compact" type="button" @click="decrement">
+          -1
+        </UiButton>
+        <UiButton variant="ghost" size="compact" type="button" @click="increment">
+          +1
+        </UiButton>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

@@ -5,9 +5,21 @@ import { useAuthStore } from "../stores/authStore";
 import { useSessionStore } from "../stores/sessionStore";
 import CountdownCard from "../components/CountdownCard.vue";
 import FearTracker from "../components/FearTracker.vue";
-import IconFlame from "../components/icons/IconFlame.vue";
-import IconHourglass from "../components/icons/IconHourglass.vue";
-import IconUsers from "../components/icons/IconUsers.vue";
+import UiButton from "../components/ui/UiButton.vue";
+import UiCard from "../components/ui/UiCard.vue";
+import UiField from "../components/ui/UiField.vue";
+import UiInput from "../components/ui/UiInput.vue";
+import UiPanelTitle from "../components/ui/UiPanelTitle.vue";
+import {
+  CirclePlus,
+  ClipboardCopy,
+  Crown,
+  Hourglass,
+  LogOut,
+  ScrollText,
+  Users,
+  X,
+} from "lucide-vue-next";
 
 const authStore = useAuthStore();
 const sessionStore = useSessionStore();
@@ -86,7 +98,7 @@ const handleAddCountdown = async () => {
 
 <template>
   <main class="screen screen-wide session-screen">
-    <section v-if="!isActiveSession" class="panel wide">
+    <UiCard v-if="!isActiveSession" as="section" variant="panel" wide>
       <p class="eyebrow">No active session</p>
       <h1>The hall is quiet.</h1>
       <p class="lede">
@@ -94,30 +106,45 @@ const handleAddCountdown = async () => {
         appear here automatically.
       </p>
       <div class="cta-row">
-        <router-link class="btn primary" to="/create">Host a session</router-link>
-        <router-link class="btn ghost" to="/join">Join a session</router-link>
+        <UiButton variant="primary" to="/create">Host a session</UiButton>
+        <UiButton variant="ghost" to="/join">Join a session</UiButton>
       </div>
-    </section>
+    </UiCard>
 
     <section v-else class="session-core">
       <header class="session-banner">
-        <div>
-          <p class="eyebrow">Session</p>
-          <h1>{{ session?.name || "Untitled session" }}</h1>
-          <p class="lede">
-            Host: {{ session?.host.name }} ·
-            <span class="meta">Expires {{ sessionExpiresLabel }}</span>
-          </p>
+        <div class="session-banner-main">
+          <div>
+            <p class="eyebrow">Session</p>
+            <h1>{{ session?.name || "Untitled session" }}</h1>
+            <p class="lede">Host: {{ session?.host.name }}</p>
+          </div>
+          <div class="session-code">
+            <span class="meta">Join code</span>
+            <strong class="code-text code-chip">{{ session?.code }}</strong>
+          </div>
         </div>
         <div class="session-banner-actions">
-          <button class="btn ghost compact" type="button" @click="handleCopyCode">
+          <UiButton
+            variant="ghost"
+            size="compact"
+            type="button"
+            @click="handleCopyCode"
+          >
+            <span class="icon"><ClipboardCopy /></span>
             <span v-if="copyStatus === 'copied'">Code copied</span>
             <span v-else-if="copyStatus === 'failed'">Copy failed</span>
             <span v-else>Copy join code</span>
-          </button>
-          <button class="btn subtle compact" type="button" @click="handleLeave">
+          </UiButton>
+          <UiButton
+            variant="subtle"
+            size="compact"
+            type="button"
+            @click="handleLeave"
+          >
+            <span class="icon"><LogOut /></span>
             Leave session
-          </button>
+          </UiButton>
         </div>
       </header>
 
@@ -128,34 +155,43 @@ const handleAddCountdown = async () => {
         Syncing session...
       </p>
 
-      <FearTracker
-        :value="session?.fear ?? 0"
-        :can-edit="sessionStore.isHost.value"
-        :minimized="fearMinimized"
-        @set="sessionStore.setFear"
-        @toggle="fearMinimized = !fearMinimized"
-      />
+      <div class="fear-stage">
+        <FearTracker
+          :value="session?.fear ?? 0"
+          :can-edit="sessionStore.isHost.value"
+          :minimized="fearMinimized"
+          @set="sessionStore.setFear"
+          @toggle="fearMinimized = !fearMinimized"
+        />
+      </div>
 
       <div class="session-grid">
-        <section class="countdown-panel">
+        <UiCard as="section" variant="countdown-panel">
           <div class="countdown-panel-header">
-            <div class="panel-title">
-              <span class="icon ember"><IconHourglass /></span>
+            <UiPanelTitle>
+              <template #icon>
+                <span class="icon ember"><Hourglass /></span>
+              </template>
               <div>
                 <h2>Countdowns</h2>
                 <p class="lede">
                   Track looming threats, rituals, or escape clocks.
                 </p>
               </div>
-            </div>
-            <button
+            </UiPanelTitle>
+            <UiButton
               v-if="sessionStore.isHost.value"
-              class="btn primary compact"
+              variant="primary"
+              size="compact"
               type="button"
               @click="showCountdownForm = !showCountdownForm"
             >
+              <span class="icon">
+                <X v-if="showCountdownForm" />
+                <CirclePlus v-else />
+              </span>
               {{ showCountdownForm ? "Close" : "Add countdown" }}
-            </button>
+            </UiButton>
           </div>
 
           <form
@@ -163,21 +199,27 @@ const handleAddCountdown = async () => {
             class="panel-form split"
             @submit.prevent="handleAddCountdown"
           >
-            <label class="field">
-              <span>Name</span>
-              <input
+            <UiField label="Name" id="countdown-name">
+              <UiInput
+                id="countdown-name"
                 v-model="countdownName"
                 type="text"
                 placeholder="Reinforcements arrive"
                 maxlength="40"
                 required
               />
-            </label>
-            <label class="field">
-              <span>Max</span>
-              <input v-model.number="countdownMax" type="number" min="1" />
-            </label>
-            <button class="btn primary" type="submit">Create countdown</button>
+            </UiField>
+            <UiField label="Max" id="countdown-max">
+              <UiInput
+                id="countdown-max"
+                v-model.number="countdownMax"
+                type="number"
+                min="1"
+              />
+            </UiField>
+            <UiButton variant="primary" type="submit">
+              Create countdown
+            </UiButton>
           </form>
 
           <p v-if="sessionStore.countdownError.value" class="error">
@@ -197,58 +239,74 @@ const handleAddCountdown = async () => {
           <div v-else class="panel-footer">
             No countdowns yet. Create one to get started.
           </div>
-        </section>
+        </UiCard>
 
         <aside class="side-panel">
-          <section class="side-card">
-            <div class="panel-title">
-              <span class="icon ember"><IconUsers /></span>
+          <UiCard as="section" variant="side">
+            <UiPanelTitle>
+              <template #icon>
+                <span class="icon ember"><Users /></span>
+              </template>
               <div>
                 <h3>Roster</h3>
                 <p class="lede small">
                   {{ sessionStore.members.value.length }} in session
                 </p>
               </div>
-            </div>
+            </UiPanelTitle>
             <ul v-if="sessionStore.members.value.length" class="roster-list">
               <li
                 v-for="member in sessionStore.members.value"
                 :key="member.id"
                 class="roster-item"
+                :class="{ 'is-host': member.role === 'host' }"
               >
                 <div>
                   <strong>{{ member.name }}</strong>
-                  <span class="meta">
+                  <span class="meta roster-role">
+                    <Crown
+                      v-if="member.role === 'host'"
+                      class="inline-icon"
+                    />
                     {{ member.role === "host" ? "Host" : "Player" }}
                   </span>
                 </div>
-                <span class="roster-badge">
+                <span
+                  class="roster-badge"
+                  :class="member.isGuest ? 'guest' : 'signed-in'"
+                >
                   {{ member.isGuest ? "Guest" : "Signed in" }}
                 </span>
               </li>
             </ul>
             <p v-else class="panel-footer">No members yet.</p>
-          </section>
+          </UiCard>
 
-          <section class="side-card">
-            <div class="panel-title">
-              <span class="icon ember"><IconFlame /></span>
+          <UiCard as="section" variant="side">
+            <UiPanelTitle>
+              <template #icon>
+                <span class="icon gild"><ScrollText /></span>
+              </template>
               <div>
                 <h3>Session details</h3>
-                <p class="lede small">Keep the table moving.</p>
+                <p class="lede small">Short-lived rooms keep focus sharp.</p>
               </div>
-            </div>
+            </UiPanelTitle>
             <div class="detail-grid">
               <div>
-                <span class="meta">Join code</span>
-                <strong class="code-text">{{ session?.code }}</strong>
-              </div>
-              <div>
-                <span class="meta">Code expires</span>
+                <span class="meta">Code rotates</span>
                 <strong>{{ codeExpiresLabel }}</strong>
               </div>
+              <div>
+                <span class="meta">Session ends</span>
+                <strong>{{ sessionExpiresLabel }}</strong>
+              </div>
+              <div>
+                <span class="meta">Countdowns</span>
+                <strong>Unlimited</strong>
+              </div>
             </div>
-          </section>
+          </UiCard>
         </aside>
       </div>
     </section>

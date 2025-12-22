@@ -54,6 +54,36 @@ service cloud.firestore {
         data.value <= data.max;
     }
 
+    function validInvite(data) {
+      return data.toUid is string &&
+        data.fromUid is string &&
+        data.fromName is string &&
+        data.sessionId is string &&
+        (data.sessionName == null || data.sessionName is string) &&
+        data.sessionCode is string &&
+        (data.sessionExpiresAt == null || data.sessionExpiresAt is timestamp) &&
+        (data.message == null || data.message is string) &&
+        data.status in ["pending", "accepted", "declined", "revoked"] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function validFriendship(data) {
+      return data.users is list &&
+        data.users.size() == 2 &&
+        data.users[0] is string &&
+        data.users[1] is string &&
+        data.requesterUid is string &&
+        data.requesterName is string &&
+        (data.requesterPhotoURL == null || data.requesterPhotoURL is string) &&
+        data.addresseeUid is string &&
+        data.addresseeName is string &&
+        (data.addresseePhotoURL == null || data.addresseePhotoURL is string) &&
+        data.status in ["pending", "accepted", "declined", "cancelled"] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
     match /sessions/{sessionId} {
       allow read: if true;
       allow create: if validSession(request.resource.data);
@@ -95,6 +125,65 @@ service cloud.firestore {
       match /sessions/{sessionId} {
         allow read, write: if isAuthed() && request.auth.uid == uid;
       }
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if isAuthed();
+      allow write: if isAuthed() && request.auth.uid == uid;
+    }
+
+    match /friendships/{friendshipId} {
+      allow read: if isAuthed() && request.auth.uid in resource.data.users;
+      allow create: if isAuthed() &&
+        request.resource.data.requesterUid == request.auth.uid &&
+        request.resource.data.status == "pending" &&
+        request.auth.uid in request.resource.data.users &&
+        validFriendship(request.resource.data);
+      allow update: if isAuthed() &&
+        validFriendship(request.resource.data) &&
+        request.resource.data.users == resource.data.users &&
+        request.resource.data.requesterUid == resource.data.requesterUid &&
+        request.resource.data.requesterName == resource.data.requesterName &&
+        request.resource.data.requesterPhotoURL == resource.data.requesterPhotoURL &&
+        request.resource.data.addresseeUid == resource.data.addresseeUid &&
+        request.resource.data.addresseeName == resource.data.addresseeName &&
+        request.resource.data.addresseePhotoURL == resource.data.addresseePhotoURL &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (
+          (request.auth.uid == resource.data.addresseeUid &&
+            request.resource.data.status in ["accepted", "declined"]) ||
+          (request.auth.uid == resource.data.requesterUid &&
+            request.resource.data.status == "cancelled")
+        );
+      allow delete: if false;
+    }
+
+    match /invites/{inviteId} {
+      allow read: if isAuthed() &&
+        (resource.data.toUid == request.auth.uid ||
+          resource.data.fromUid == request.auth.uid);
+      allow create: if isAuthed() &&
+        request.resource.data.fromUid == request.auth.uid &&
+        request.resource.data.status == "pending" &&
+        validInvite(request.resource.data);
+      allow update: if isAuthed() &&
+        validInvite(request.resource.data) &&
+        request.resource.data.toUid == resource.data.toUid &&
+        request.resource.data.fromUid == resource.data.fromUid &&
+        request.resource.data.fromName == resource.data.fromName &&
+        request.resource.data.sessionId == resource.data.sessionId &&
+        request.resource.data.sessionName == resource.data.sessionName &&
+        request.resource.data.sessionCode == resource.data.sessionCode &&
+        request.resource.data.sessionExpiresAt == resource.data.sessionExpiresAt &&
+        request.resource.data.message == resource.data.message &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        (
+          (request.auth.uid == resource.data.toUid &&
+            request.resource.data.status in ["accepted", "declined"]) ||
+          (request.auth.uid == resource.data.fromUid &&
+            request.resource.data.status == "revoked")
+        );
+      allow delete: if false;
     }
   }
 }

@@ -4,10 +4,26 @@ import { useRoute, useRouter } from "vue-router";
 import { Analytics } from "@vercel/analytics/vue";
 import { useAuthStore } from "./stores/authStore";
 import { useSessionStore } from "./stores/sessionStore";
+import { useInviteStore } from "./stores/inviteStore";
+import { useFriendStore } from "./stores/friendStore";
+import { useThemeStore } from "./stores/themeStore";
+import { DoorOpen, Flame, Moon, Sun, Sword, UserRound } from "lucide-vue-next";
+import UiButton from "./components/ui/UiButton.vue";
 
 const authStore = useAuthStore();
 const sessionStore = useSessionStore();
+const inviteStore = useInviteStore();
+const friendStore = useFriendStore();
+const themeStore = useThemeStore();
 authStore.init();
+inviteStore.init();
+friendStore.init();
+themeStore.init();
+
+const notificationCount = computed(
+  () => inviteStore.pendingCount.value + friendStore.pendingIncomingCount.value,
+);
+const isLightMode = computed(() => themeStore.theme.value === "light");
 
 const route = useRoute();
 const router = useRouter();
@@ -32,44 +48,81 @@ const goToSession = () => {
       </div>
 
       <nav class="nav-links">
-        <router-link to="/" class="nav-link">Sanctum</router-link>
-        <router-link to="/create" class="nav-link">Host</router-link>
-        <router-link to="/join" class="nav-link">Join</router-link>
+        <router-link to="/" class="nav-link">
+          <span class="icon"><Flame /></span>
+          Sanctum
+        </router-link>
+        <router-link to="/create" class="nav-link">
+          <span class="icon"><Sword /></span>
+          Host
+        </router-link>
+        <router-link to="/join" class="nav-link">
+          <span class="icon"><DoorOpen /></span>
+          Join
+        </router-link>
+        <router-link to="/account" class="nav-link">
+          <span class="icon"><UserRound /></span>
+          Account
+          <span v-if="notificationCount" class="nav-badge">
+            {{ notificationCount }}
+          </span>
+        </router-link>
       </nav>
 
       <div class="nav-actions">
-        <button
+        <UiButton
           v-if="activeSessionId"
-          class="btn ghost compact"
+          variant="ghost"
+          size="compact"
           type="button"
           @click="goToSession"
         >
           Return to session
-        </button>
+        </UiButton>
+
+        <UiButton
+          class="theme-toggle"
+          variant="ghost"
+          size="compact"
+          type="button"
+          :aria-label="isLightMode ? 'Switch to dark mode' : 'Switch to light mode'"
+          @click="themeStore.toggle"
+        >
+          <span class="icon">
+            <Sun v-if="isLightMode" />
+            <Moon v-else />
+          </span>
+        </UiButton>
 
         <div v-if="authStore.currentUser.value" class="user-chip">
           <span class="user-name">{{ authStore.displayName.value }}</span>
-          <button
-            class="btn ghost compact"
+          <UiButton
+            variant="ghost"
+            size="compact"
             type="button"
             :disabled="authStore.authBusy.value"
             @click="authStore.signOut"
           >
             Sign out
-          </button>
+          </UiButton>
         </div>
-        <button
+        <UiButton
           v-else
-          class="btn ghost compact"
+          variant="ghost"
+          size="compact"
           type="button"
           @click="goLogin"
         >
           Sign in
-        </button>
+        </UiButton>
       </div>
     </header>
 
-    <router-view />
+    <router-view v-slot="{ Component }">
+      <transition name="page-fade" mode="out-in">
+        <component :is="Component" />
+      </transition>
+    </router-view>
     <Analytics />
   </div>
 </template>

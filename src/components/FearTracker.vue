@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import IconFlame from "./icons/IconFlame.vue";
+import { Flame } from "lucide-vue-next";
+import UiButton from "./ui/UiButton.vue";
+import UiPanelTitle from "./ui/UiPanelTitle.vue";
 
 const props = defineProps<{
   value: number;
@@ -29,27 +31,29 @@ const increment = () => emit("set", clampedValue.value + 1);
 <template>
   <section class="fear-altar" :class="{ minimized }">
     <header class="fear-header">
-      <div class="panel-title">
-        <span class="icon ember"><IconFlame /></span>
+      <UiPanelTitle>
+        <template #icon>
+          <span class="icon ember"><Flame /></span>
+        </template>
         <div>
           <p class="eyebrow">Fear tracker</p>
           <h2>Fear commands the table</h2>
         </div>
-      </div>
-      <button class="btn ghost compact" type="button" @click="emit('toggle')">
+      </UiPanelTitle>
+      <UiButton variant="ghost" size="compact" type="button" @click="emit('toggle')">
         {{ minimized ? "Expand" : "Minimize" }}
-      </button>
+      </UiButton>
     </header>
 
     <div v-if="!minimized" class="fear-body">
       <div
-        class="fear-dial"
-        :style="{
-          '--count': levels.length,
-          '--radius': '120px',
-          '--dot-size': '36px',
-        }"
-      >
+      class="fear-dial"
+      :style="{
+        '--count': levels.length,
+        '--radius': 'var(--fear-radius)',
+        '--dot-size': 'var(--fear-dot)',
+      }"
+    >
         <div class="fear-core">
           <span class="meta">Current fear</span>
           <strong>{{ clampedValue }}</strong>
@@ -74,12 +78,12 @@ const increment = () => emit("set", clampedValue.value + 1);
       </div>
 
       <div v-if="canEdit" class="fear-controls">
-        <button class="btn subtle" type="button" @click="decrement">
+        <UiButton variant="subtle" type="button" @click="decrement">
           Lower
-        </button>
-        <button class="btn primary" type="button" @click="increment">
+        </UiButton>
+        <UiButton variant="primary" type="button" @click="increment">
           Raise
-        </button>
+        </UiButton>
       </div>
     </div>
   </section>

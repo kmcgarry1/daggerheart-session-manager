@@ -4,6 +4,7 @@ import LoginView from "./views/LoginView.vue";
 import CreateView from "./views/CreateView.vue";
 import JoinView from "./views/JoinView.vue";
 import SessionView from "./views/SessionView.vue";
+import AccountView from "./views/AccountView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -33,6 +34,11 @@ const router = createRouter({
       path: "/session/:sessionId",
       name: "session",
       component: SessionView,
+    },
+    {
+      path: "/account",
+      name: "account",
+      component: AccountView,
     },
   ],
 });
