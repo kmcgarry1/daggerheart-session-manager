@@ -13,6 +13,37 @@ import {
 import type { User } from "firebase/auth";
 import { db } from "../firebase";
 
+const INVITE_CODE_LENGTH = 6;
+const INVITE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+type CryptoLike = {
+  getRandomValues?: (array: Uint8Array) => Uint8Array;
+};
+
+const getCrypto = (): CryptoLike | null => {
+  if (typeof globalThis === "undefined") {
+    return null;
+  }
+  const cryptoRef = (globalThis as { crypto?: CryptoLike }).crypto;
+  return cryptoRef ?? null;
+};
+
+const generateInviteCode = () => {
+  const cryptoRef = getCrypto();
+  const bytes = new Uint8Array(INVITE_CODE_LENGTH);
+  if (cryptoRef?.getRandomValues) {
+    cryptoRef.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < bytes.length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+
+  return Array.from(bytes, (byte) => INVITE_CODE_CHARS[byte % INVITE_CODE_CHARS.length])
+    .join("")
+    .toUpperCase();
+};
+
 export type UserSessionRecord = {
   id: string;
   code: string;
@@ -26,13 +57,25 @@ export type UserSessionRecord = {
 export const ensureUserProfile = async (user: User) => {
   const ref = doc(db, "users", user.uid);
   const snapshot = await getDoc(ref);
+  const existingInviteCode =
+    (snapshot.data()?.inviteCode as string | undefined) ?? null;
+  const inviteCode = existingInviteCode ?? generateInviteCode();
+  const emailLower = user.email ? user.email.toLowerCase() : null;
 
   if (!snapshot.exists()) {
     await setDoc(ref, {
       displayName: user.displayName ?? null,
       email: user.email ?? null,
+      emailLower,
       photoURL: user.photoURL ?? null,
+      inviteCode,
       createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    await setDoc(doc(db, "publicProfiles", user.uid), {
+      displayName: user.displayName ?? null,
+      photoURL: user.photoURL ?? null,
+      inviteCode,
       updatedAt: serverTimestamp(),
     });
     return;
@@ -43,7 +86,20 @@ export const ensureUserProfile = async (user: User) => {
     {
       displayName: user.displayName ?? null,
       email: user.email ?? null,
+      emailLower,
       photoURL: user.photoURL ?? null,
+      inviteCode,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await setDoc(
+    doc(db, "publicProfiles", user.uid),
+    {
+      displayName: user.displayName ?? null,
+      photoURL: user.photoURL ?? null,
+      inviteCode,
       updatedAt: serverTimestamp(),
     },
     { merge: true },

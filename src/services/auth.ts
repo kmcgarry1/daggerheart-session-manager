@@ -1,9 +1,12 @@
 import {
   GoogleAuthProvider,
   OAuthProvider,
+  createUserWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
+  signInWithEmailAndPassword,
   signOut,
+  updateProfile,
 } from "firebase/auth";
 import { auth } from "../firebase";
 
@@ -43,6 +46,26 @@ export const signInWithApple = () => {
   provider.addScope("email");
   provider.addScope("name");
   return signInWithProvider(provider);
+};
+
+export const signInWithEmail = (email: string, password: string) =>
+  signInWithEmailAndPassword(auth, email, password);
+
+export const signUpWithEmail = async ({
+  displayName,
+  email,
+  password,
+}: {
+  displayName: string;
+  email: string;
+  password: string;
+}) => {
+  const credential = await createUserWithEmailAndPassword(auth, email, password);
+  const trimmedName = displayName.trim();
+  if (trimmedName) {
+    await updateProfile(credential.user, { displayName: trimmedName });
+  }
+  return credential.user;
 };
 
 export const signOutUser = () => signOut(auth);

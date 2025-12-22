@@ -1,9 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
 import WelcomeView from "./views/WelcomeView.vue";
 import LoginView from "./views/LoginView.vue";
+import SignupView from "./views/SignupView.vue";
 import CreateView from "./views/CreateView.vue";
 import JoinView from "./views/JoinView.vue";
 import SessionView from "./views/SessionView.vue";
+import AccountView from "./views/AccountView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -20,6 +22,12 @@ const router = createRouter({
       meta: { hideNav: true },
     },
     {
+      path: "/signup",
+      name: "signup",
+      component: SignupView,
+      meta: { hideNav: true },
+    },
+    {
       path: "/create",
       name: "create",
       component: CreateView,
@@ -33,6 +41,11 @@ const router = createRouter({
       path: "/session/:sessionId",
       name: "session",
       component: SessionView,
+    },
+    {
+      path: "/account",
+      name: "account",
+      component: AccountView,
     },
   ],
 });

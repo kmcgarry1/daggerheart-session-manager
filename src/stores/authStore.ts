@@ -1,7 +1,12 @@
 import { computed, ref } from "vue";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "../firebase";
-import { signInWithGoogle, signOutUser } from "../services/auth";
+import {
+  signInWithEmail,
+  signInWithGoogle,
+  signOutUser,
+  signUpWithEmail,
+} from "../services/auth";
 import {
   ensureUserProfile,
   fetchUserSessions,
@@ -37,6 +42,28 @@ const displayName = computed(() => {
 const memberId = computed(() =>
   getMemberId(currentUser.value?.uid ?? null, guestIdentity.value.id),
 );
+
+const resolveAuthError = (error: unknown, fallback: string) => {
+  const code = (error as { code?: string }).code;
+  switch (code) {
+    case "auth/email-already-in-use":
+      return "That email already has an account.";
+    case "auth/invalid-email":
+      return "Enter a valid email address.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/user-not-found":
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+      return "Incorrect email or password.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Try again later.";
+    case "auth/operation-not-allowed":
+      return "Email/password sign-in is not enabled for this project.";
+    default:
+      return fallback;
+  }
+};
 
 const refreshSavedSessions = async () => {
   if (!currentUser.value) {
@@ -85,7 +112,51 @@ const signIn = async () => {
     await signInWithGoogle();
   } catch (error) {
     console.error(error);
-    authError.value = "Sign-in failed. Please try again.";
+    authError.value = resolveAuthError(
+      error,
+      "Sign-in failed. Please try again.",
+    );
+  } finally {
+    authBusy.value = false;
+  }
+};
+
+const signInWithEmailAddress = async (email: string, password: string) => {
+  authBusy.value = true;
+  authError.value = null;
+  try {
+    await signInWithEmail(email, password);
+  } catch (error) {
+    console.error(error);
+    authError.value = resolveAuthError(
+      error,
+      "Email sign-in failed. Please try again.",
+    );
+  } finally {
+    authBusy.value = false;
+  }
+};
+
+const signUpWithEmailAddress = async ({
+  displayName: name,
+  email,
+  password,
+}: {
+  displayName: string;
+  email: string;
+  password: string;
+}) => {
+  authBusy.value = true;
+  authError.value = null;
+  try {
+    const user = await signUpWithEmail({ displayName: name, email, password });
+    await ensureUserProfile(user);
+  } catch (error) {
+    console.error(error);
+    authError.value = resolveAuthError(
+      error,
+      "Account creation failed. Please try again.",
+    );
   } finally {
     authBusy.value = false;
   }
@@ -168,6 +239,8 @@ export const useAuthStore = () => ({
   dispose,
   signIn,
   signOut,
+  signInWithEmail: signInWithEmailAddress,
+  signUpWithEmail: signUpWithEmailAddress,
   refreshSavedSessions,
   updateGuestName,
   recordSession,
