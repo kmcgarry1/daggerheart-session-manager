@@ -334,6 +334,12 @@ h2 {
   align-items: start;
 }
 
+.session-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .countdown-panel {
   display: flex;
   flex-direction: column;
@@ -470,6 +476,70 @@ h2 {
 .countdown-controls {
   display: flex;
   gap: 8px;
+}
+
+.roster-panel {
+  background: rgba(255, 255, 255, 0.82);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  border: 1px solid rgba(63, 52, 48, 0.12);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roster-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.roster-header h3 {
+  margin: 6px 0 0;
+  font-size: 1.1rem;
+  font-family: var(--font-display);
+}
+
+.roster-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roster-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(245, 239, 229, 0.7);
+  border: 1px solid rgba(63, 52, 48, 0.08);
+}
+
+.roster-item strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.roster-item .meta-label {
+  display: block;
+}
+
+.roster-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(180, 71, 52, 0.12);
+  color: var(--color-ember-dark);
+  border: 1px solid rgba(180, 71, 52, 0.2);
 }
 
 .fear-panel {

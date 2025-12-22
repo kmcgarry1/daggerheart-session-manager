@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { auth } from "./firebase";
-import { signInWithApple, signInWithGoogle, signOutUser } from "./services/auth";
+import { signInWithGoogle, signOutUser } from "./services/auth";
 import { getGuestIdentity, getMemberId, setGuestName } from "./services/guests";
 import {
   addCountdown,
@@ -11,11 +11,13 @@ import {
   findSessionByCode,
   joinSession,
   removeCountdown,
+  subscribeToMembers,
   subscribeToCountdowns,
   subscribeToSession,
   updateCountdown,
   updateFear,
   type CountdownData,
+  type MemberData,
   type SessionData,
 } from "./services/sessions";
 import {
@@ -50,6 +52,7 @@ const joining = ref(false);
 const activeSessionId = ref<string | null>(null);
 const activeSession = ref<SessionData | null>(null);
 const countdowns = ref<CountdownData[]>([]);
+const members = ref<MemberData[]>([]);
 const sessionLoading = ref(false);
 
 const fearMinimized = ref(false);
@@ -114,11 +117,13 @@ const stopSessionListeners = () => {
   activeSessionId.value = null;
   activeSession.value = null;
   countdowns.value = [];
+  members.value = [];
   sessionLoading.value = false;
 };
 
 let sessionUnsubscribe: (() => void) | null = null;
 let countdownUnsubscribe: (() => void) | null = null;
+let membersUnsubscribe: (() => void) | null = null;
 
 const clearSubscriptions = () => {
   if (sessionUnsubscribe) {
@@ -128,6 +133,10 @@ const clearSubscriptions = () => {
   if (countdownUnsubscribe) {
     countdownUnsubscribe();
     countdownUnsubscribe = null;
+  }
+  if (membersUnsubscribe) {
+    membersUnsubscribe();
+    membersUnsubscribe = null;
   }
 };
 
@@ -162,6 +171,17 @@ const startSessionListeners = (sessionId: string) => {
     (error) => {
       console.error(error);
       sessionError.value = "Unable to load countdowns.";
+    },
+  );
+
+  membersUnsubscribe = subscribeToMembers(
+    sessionId,
+    (nextMembers) => {
+      members.value = nextMembers;
+    },
+    (error) => {
+      console.error(error);
+      sessionError.value = "Unable to load session members.";
     },
   );
 };
@@ -204,15 +224,11 @@ watch(
   },
 );
 
-const handleAuth = async (provider: "google" | "apple") => {
+const handleAuth = async () => {
   authBusy.value = true;
   authError.value = null;
   try {
-    if (provider === "google") {
-      await signInWithGoogle();
-    } else {
-      await signInWithApple();
-    }
+    await signInWithGoogle();
   } catch (error) {
     console.error(error);
     authError.value = "Sign-in failed. Please try again.";
@@ -577,17 +593,9 @@ onBeforeUnmount(() => {
               class="btn secondary compact"
               type="button"
               :disabled="authBusy"
-              @click="handleAuth('google')"
+              @click="handleAuth"
             >
               Google
-            </button>
-            <button
-              class="btn secondary compact"
-              type="button"
-              :disabled="authBusy"
-              @click="handleAuth('apple')"
-            >
-              Apple
             </button>
           </div>
           <p v-if="authError" class="error auth-error" role="alert">
@@ -692,13 +700,40 @@ onBeforeUnmount(() => {
           </div>
         </section>
 
-        <FearTracker
-          :value="activeSession.fear"
-          :can-edit="isHost"
-          :minimized="fearMinimized"
-          @set="handleSetFear"
-          @toggle="fearMinimized = !fearMinimized"
-        />
+        <div class="session-side">
+          <section class="roster-panel">
+            <div class="roster-header">
+              <div>
+                <span class="meta-label">Roster</span>
+                <h3>Session members</h3>
+              </div>
+              <span class="meta-value">{{ members.length }}</span>
+            </div>
+
+            <ul v-if="members.length" class="roster-list">
+              <li v-for="member in members" :key="member.id" class="roster-item">
+                <div>
+                  <strong>{{ member.name }}</strong>
+                  <span class="meta-label">
+                    {{ member.role === "host" ? "Host" : "Player" }}
+                  </span>
+                </div>
+                <span class="roster-badge">
+                  {{ member.isGuest ? "Guest" : "Signed in" }}
+                </span>
+              </li>
+            </ul>
+            <p v-else class="panel-footer">No members yet.</p>
+          </section>
+
+          <FearTracker
+            :value="activeSession.fear"
+            :can-edit="isHost"
+            :minimized="fearMinimized"
+            @set="handleSetFear"
+            @toggle="fearMinimized = !fearMinimized"
+          />
+        </div>
       </div>
 
       <div class="session-footer">

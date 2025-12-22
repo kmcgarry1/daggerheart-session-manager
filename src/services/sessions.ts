@@ -50,6 +50,16 @@ export type CountdownData = {
   updatedAt: Date | null;
 };
 
+export type MemberData = {
+  id: string;
+  name: string;
+  uid: string | null;
+  isGuest: boolean;
+  role: "host" | "player";
+  joinedAt: Date | null;
+  lastSeenAt: Date | null;
+};
+
 type SessionDoc = Omit<SessionData, "id" | "codeExpiresAt" | "sessionExpiresAt"> & {
   codeExpiresAt: Timestamp;
   sessionExpiresAt: Timestamp;
@@ -64,6 +74,11 @@ type CountdownDoc = Omit<CountdownData, "id" | "createdAt" | "updatedAt"> & {
     memberId: string;
     isGuest: boolean;
   };
+};
+
+type MemberDoc = Omit<MemberData, "id" | "joinedAt" | "lastSeenAt"> & {
+  joinedAt?: Timestamp;
+  lastSeenAt?: Timestamp;
 };
 
 type CreateSessionParams = {
@@ -127,6 +142,16 @@ const mapCountdownData = (id: string, data: CountdownDoc): CountdownData => ({
   value: data.value ?? 0,
   createdAt: data.createdAt ? data.createdAt.toDate() : null,
   updatedAt: data.updatedAt ? data.updatedAt.toDate() : null,
+});
+
+const mapMemberData = (id: string, data: MemberDoc): MemberData => ({
+  id,
+  name: data.name,
+  uid: data.uid ?? null,
+  isGuest: data.isGuest ?? true,
+  role: data.role ?? "player",
+  joinedAt: data.joinedAt ? data.joinedAt.toDate() : null,
+  lastSeenAt: data.lastSeenAt ? data.lastSeenAt.toDate() : null,
 });
 
 const isCodeAvailable = async (code: string) => {
@@ -297,6 +322,29 @@ export const subscribeToCountdowns = (
         mapCountdownData(docSnap.id, docSnap.data() as CountdownDoc),
       );
       onChange(countdowns);
+    },
+    (error) => {
+      if (onError) {
+        onError(error);
+      }
+    },
+  );
+
+export const subscribeToMembers = (
+  sessionId: string,
+  onChange: (members: MemberData[]) => void,
+  onError?: (error: Error) => void,
+) =>
+  onSnapshot(
+    query(
+      collection(db, SESSION_COLLECTION, sessionId, "members"),
+      orderBy("joinedAt", "asc"),
+    ),
+    (snapshot) => {
+      const members = snapshot.docs.map((docSnap) =>
+        mapMemberData(docSnap.id, docSnap.data() as MemberDoc),
+      );
+      onChange(members);
     },
     (error) => {
       if (onError) {
