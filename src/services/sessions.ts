@@ -5,19 +5,17 @@ import {
   deleteDoc,
   doc,
   getDoc,
-  getDocs,
-  limit,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
-  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 
 const SESSION_COLLECTION = "sessions";
+const SESSION_CODE_COLLECTION = "sessionCodes";
 const CODE_LENGTH = 6;
 const CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_TTL_MS = 60 * 60 * 1000;
@@ -81,11 +79,18 @@ type MemberDoc = Omit<MemberData, "id" | "joinedAt" | "lastSeenAt"> & {
   lastSeenAt?: Timestamp;
 };
 
+type SessionCodeDoc = {
+  sessionId: string;
+  codeExpiresAt?: Timestamp;
+  sessionExpiresAt?: Timestamp;
+};
+
 type CreateSessionParams = {
   hostName: string;
   sessionName?: string;
   hostUid?: string | null;
   hostMemberId: string;
+  hostIsGuest?: boolean;
 };
 
 type JoinSessionParams = {
@@ -94,6 +99,7 @@ type JoinSessionParams = {
   name: string;
   uid?: string | null;
   role?: "host" | "player";
+  isGuest?: boolean;
 };
 
 type CreatedSession = {
@@ -155,11 +161,8 @@ const mapMemberData = (id: string, data: MemberDoc): MemberData => ({
 });
 
 const isCodeAvailable = async (code: string) => {
-  const sessionsRef = collection(db, SESSION_COLLECTION);
-  const existing = await getDocs(
-    query(sessionsRef, where("code", "==", code), limit(1)),
-  );
-  return existing.empty;
+  const snapshot = await getDoc(doc(db, SESSION_CODE_COLLECTION, code));
+  return !snapshot.exists();
 };
 
 const reserveJoinCode = async () => {
@@ -177,6 +180,7 @@ export const createSession = async ({
   sessionName,
   hostUid = null,
   hostMemberId,
+  hostIsGuest,
 }: CreateSessionParams): Promise<CreatedSession> => {
   const trimmedHost = hostName.trim();
   const trimmedSession = sessionName?.trim();
@@ -193,14 +197,17 @@ export const createSession = async ({
   const codeExpiresAt = new Date(now + CODE_TTL_MS);
   const sessionExpiresAt = new Date(now + SESSION_TTL_MS);
 
+  const resolvedHostUid = hostUid ?? null;
+  const resolvedHostGuest = hostIsGuest ?? !resolvedHostUid;
+
   const docRef = await addDoc(collection(db, SESSION_COLLECTION), {
     code,
     name: trimmedSession || null,
     host: {
       name: trimmedHost,
-      uid: hostUid,
+      uid: resolvedHostUid,
       memberId: trimmedMember,
-      isGuest: !hostUid,
+      isGuest: resolvedHostGuest,
     },
     fear: 0,
     createdAt: serverTimestamp(),
@@ -213,14 +220,21 @@ export const createSession = async ({
     doc(db, SESSION_COLLECTION, docRef.id, "members", trimmedMember),
     {
       name: trimmedHost,
-      uid: hostUid,
-      isGuest: !hostUid,
+      uid: resolvedHostUid,
+      isGuest: resolvedHostGuest,
       role: "host",
       joinedAt: serverTimestamp(),
       lastSeenAt: serverTimestamp(),
     },
     { merge: true },
   );
+
+  await setDoc(doc(db, SESSION_CODE_COLLECTION, code), {
+    sessionId: docRef.id,
+    codeExpiresAt: Timestamp.fromDate(codeExpiresAt),
+    sessionExpiresAt: Timestamp.fromDate(sessionExpiresAt),
+    createdAt: serverTimestamp(),
+  });
 
   return {
     id: docRef.id,
@@ -244,20 +258,30 @@ export const findSessionByCode = async (code: string) => {
     throw new Error("Join code is required.");
   }
 
-  const sessionsRef = collection(db, SESSION_COLLECTION);
-  const snapshot = await getDocs(
-    query(sessionsRef, where("code", "==", normalized), limit(1)),
+  const codeSnapshot = await getDoc(
+    doc(db, SESSION_CODE_COLLECTION, normalized),
   );
 
-  if (snapshot.empty) {
+  if (!codeSnapshot.exists()) {
     return null;
   }
 
-  const docSnap = snapshot.docs[0];
-  if (!docSnap) {
+  const codeData = codeSnapshot.data() as SessionCodeDoc;
+  if (!codeData?.sessionId) {
     return null;
   }
-  return mapSessionData(docSnap.id, docSnap.data() as SessionDoc);
+
+  const codeExpiresAt = codeData.codeExpiresAt?.toDate() ?? null;
+  if (codeExpiresAt && codeExpiresAt.getTime() <= Date.now()) {
+    throw new Error("That join code has expired.");
+  }
+
+  const sessionExpiresAt = codeData.sessionExpiresAt?.toDate() ?? null;
+  if (sessionExpiresAt && sessionExpiresAt.getTime() <= Date.now()) {
+    throw new Error("That session has expired.");
+  }
+
+  return fetchSessionById(codeData.sessionId);
 };
 
 export const joinSession = async ({
@@ -266,18 +290,21 @@ export const joinSession = async ({
   name,
   uid = null,
   role,
+  isGuest,
 }: JoinSessionParams) => {
   const trimmedName = name.trim();
   if (!trimmedName) {
     throw new Error("Display name is required.");
   }
 
+  const resolvedIsGuest = isGuest ?? !uid;
+
   await setDoc(
     doc(db, SESSION_COLLECTION, sessionId, "members", memberId),
     {
       name: trimmedName,
       uid,
-      isGuest: !uid,
+      isGuest: resolvedIsGuest,
       role: role ?? "player",
       joinedAt: serverTimestamp(),
       lastSeenAt: serverTimestamp(),

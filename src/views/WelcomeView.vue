@@ -46,7 +46,7 @@ const fearPreview = Array.from({ length: fearPreviewMax + 1 }, (_, index) => ind
           <UiButton variant="subtle" to="/login">
             Sign in to save sessions
           </UiButton>
-          <span v-if="authStore.currentUser.value" class="meta">
+          <span v-if="authStore.isSignedIn.value" class="meta">
             Signed in as {{ authStore.displayName.value }}
           </span>
         </div>

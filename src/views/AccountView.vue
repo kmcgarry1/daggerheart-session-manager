@@ -38,7 +38,7 @@ const friendInviteStatus = ref<Record<string, "idle" | "sending" | "sent" | "fai
 
 const canInvite = computed(
   () =>
-    !!authStore.currentUser.value &&
+    authStore.isSignedIn.value &&
     !!sessionStore.activeSession.value &&
     sessionStore.isHost.value,
 );
@@ -162,7 +162,7 @@ const getInitials = (name: string) =>
           </p>
         </UiPanelHeader>
 
-        <div v-if="!authStore.currentUser.value" class="panel-footer">
+        <div v-if="!authStore.isSignedIn.value" class="panel-footer">
           <p class="lede">
             Sign in to unlock invites and persistent session access.
           </p>
@@ -210,7 +210,7 @@ const getInitials = (name: string) =>
       </UiCard>
 
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="panel"
         wide
@@ -270,7 +270,7 @@ const getInitials = (name: string) =>
       </UiCard>
 
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="panel"
         wide
@@ -368,7 +368,7 @@ const getInitials = (name: string) =>
 
     <aside class="side-panel">
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="side"
       >
@@ -432,7 +432,7 @@ const getInitials = (name: string) =>
       </UiCard>
 
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="side"
       >
@@ -516,7 +516,7 @@ const getInitials = (name: string) =>
       </UiCard>
 
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="side"
       >

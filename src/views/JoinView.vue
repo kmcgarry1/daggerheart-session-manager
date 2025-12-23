@@ -134,7 +134,7 @@ const handleResume = async (sessionId: string, role: "host" | "player") => {
       </UiCard>
 
       <UiCard
-        v-if="authStore.currentUser.value"
+        v-if="authStore.isSignedIn.value"
         as="section"
         variant="panel-alt"
         wide

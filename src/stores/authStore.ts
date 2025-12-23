@@ -3,6 +3,7 @@ import { getRedirectResult, onAuthStateChanged, type User } from "firebase/auth"
 import { auth } from "../firebase";
 import {
   consumeRedirectAttempt,
+  signInAnonymously,
   signInWithEmail,
   signInWithGoogle,
   signOutUser,
@@ -26,8 +27,19 @@ const savedSessions = ref<UserSessionRecord[]>([]);
 const loadingSavedSessions = ref(false);
 const savedSessionsError = ref<string | null>(null);
 
+let authReadyResolver: (() => void) | null = null;
+const authReadyPromise = new Promise<void>((resolve) => {
+  authReadyResolver = resolve;
+});
+
 let initialized = false;
 let authUnsubscribe: (() => void) | null = null;
+let guestAuthPromise: Promise<User | null> | null = null;
+
+const isAnonymous = computed(() => currentUser.value?.isAnonymous ?? false);
+const isSignedIn = computed(
+  () => !!currentUser.value && !currentUser.value.isAnonymous,
+);
 
 const displayName = computed(() => {
   const name = currentUser.value?.displayName;
@@ -83,7 +95,7 @@ const setAuthError = (error: unknown, fallback: string) => {
 };
 
 const refreshSavedSessions = async () => {
-  if (!currentUser.value) {
+  if (!currentUser.value || currentUser.value.isAnonymous) {
     savedSessions.value = [];
     return;
   }
@@ -124,8 +136,12 @@ const init = () => {
   authUnsubscribe = onAuthStateChanged(auth, async (user) => {
     currentUser.value = user;
     authReady.value = true;
+    if (authReadyResolver) {
+      authReadyResolver();
+      authReadyResolver = null;
+    }
 
-    if (user) {
+    if (user && !user.isAnonymous) {
       try {
         await ensureUserProfile(user);
       } catch (error) {
@@ -215,6 +231,41 @@ const updateGuestName = (name: string) => {
   };
 };
 
+const ensureGuestAuth = async () => {
+  if (!initialized) {
+    init();
+  }
+  if (!authReady.value) {
+    await authReadyPromise;
+  }
+  if (currentUser.value) {
+    return currentUser.value;
+  }
+  if (guestAuthPromise) {
+    return guestAuthPromise;
+  }
+
+  guestAuthPromise = signInAnonymously()
+    .then((credential) => {
+      currentUser.value = credential.user;
+      authReady.value = true;
+      if (authReadyResolver) {
+        authReadyResolver();
+        authReadyResolver = null;
+      }
+      return credential.user;
+    })
+    .catch((error) => {
+      console.error(error);
+      throw error;
+    })
+    .finally(() => {
+      guestAuthPromise = null;
+    });
+
+  return guestAuthPromise;
+};
+
 const recordSession = async ({
   sessionId,
   code,
@@ -230,7 +281,7 @@ const recordSession = async ({
   codeExpiresAt: Date;
   sessionExpiresAt: Date;
 }) => {
-  if (!currentUser.value) {
+  if (!currentUser.value || currentUser.value.isAnonymous) {
     return;
   }
 
@@ -258,6 +309,8 @@ export const useAuthStore = () => ({
   authError,
   authErrorCode,
   currentUser,
+  isAnonymous,
+  isSignedIn,
   guestIdentity,
   savedSessions,
   loadingSavedSessions,
@@ -272,5 +325,6 @@ export const useAuthStore = () => ({
   signUpWithEmail: signUpWithEmailAddress,
   refreshSavedSessions,
   updateGuestName,
+  ensureGuestAuth,
   recordSession,
 });
