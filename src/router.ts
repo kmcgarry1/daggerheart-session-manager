@@ -1,11 +1,11 @@
 import { createRouter, createWebHistory } from "vue-router";
-import WelcomeView from "./views/WelcomeView.vue";
-import LoginView from "./views/LoginView.vue";
-import SignupView from "./views/SignupView.vue";
-import CreateView from "./views/CreateView.vue";
-import JoinView from "./views/JoinView.vue";
-import SessionView from "./views/SessionView.vue";
-import AccountView from "./views/AccountView.vue";
+const WelcomeView = () => import("./views/WelcomeView.vue");
+const LoginView = () => import("./views/LoginView.vue");
+const SignupView = () => import("./views/SignupView.vue");
+const CreateView = () => import("./views/CreateView.vue");
+const JoinView = () => import("./views/JoinView.vue");
+const SessionView = () => import("./views/SessionView.vue");
+const AccountView = () => import("./views/AccountView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
