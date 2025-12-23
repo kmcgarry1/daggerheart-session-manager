@@ -247,12 +247,7 @@ const ensureGuestAuth = async () => {
 
   guestAuthPromise = signInAnonymously()
     .then((credential) => {
-      currentUser.value = credential.user;
-      authReady.value = true;
-      if (authReadyResolver) {
-        authReadyResolver();
-        authReadyResolver = null;
-      }
+      // Don't set currentUser or authReady here - let onAuthStateChanged handle it
       return credential.user;
     })
     .catch((error) => {

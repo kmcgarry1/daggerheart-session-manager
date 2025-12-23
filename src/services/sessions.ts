@@ -273,12 +273,12 @@ export const findSessionByCode = async (code: string) => {
 
   const codeExpiresAt = codeData.codeExpiresAt?.toDate() ?? null;
   if (codeExpiresAt && codeExpiresAt.getTime() <= Date.now()) {
-    throw new Error("That join code has expired.");
+    return null;
   }
 
   const sessionExpiresAt = codeData.sessionExpiresAt?.toDate() ?? null;
   if (sessionExpiresAt && sessionExpiresAt.getTime() <= Date.now()) {
-    throw new Error("That session has expired.");
+    return null;
   }
 
   return fetchSessionById(codeData.sessionId);

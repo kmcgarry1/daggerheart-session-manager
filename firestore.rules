@@ -25,8 +25,11 @@ service cloud.firestore {
     }
 
     function isSessionMember(sessionId) {
-      return isAuthed() &&
-        exists(/databases/$(database)/documents/sessions/$(sessionId)/members/$(request.auth.uid));
+      return isAuthed() && (
+        exists(/databases/$(database)/documents/sessions/$(sessionId)/members/$(request.auth.uid)) ||
+        (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+          exists(/databases/$(database)/documents/sessions/$(sessionId)/members/$("guest-" + request.auth.uid)))
+      );
     }
 
     function hasSavedSession(sessionId) {
@@ -134,7 +137,7 @@ service cloud.firestore {
         sessionActive(sessionId) &&
         (resource.data.codeExpiresAt > request.time ||
           isSessionMember(sessionId) ||
-          hasSavedSession(sessionId));
+          (request.auth.token.firebase.sign_in_provider != "anonymous" && hasSavedSession(sessionId)));
       allow list: if false;
       allow create: if isAuthed() &&
         validSession(request.resource.data) &&
@@ -156,13 +159,17 @@ service cloud.firestore {
       allow read: if isSessionMember(sessionId);
       allow create: if sessionActive(sessionId) &&
         isAuthed() &&
-        memberId == request.auth.uid &&
-        request.resource.data.uid == request.auth.uid &&
+        (memberId == request.auth.uid ||
+          (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+            memberId.matches("guest-.*") &&
+            request.resource.data.uid == request.auth.uid)) &&
         validMember(request.resource.data) &&
         canJoinSession(sessionId);
       allow update: if sessionActive(sessionId) &&
         isAuthed() &&
-        memberId == request.auth.uid &&
+        (memberId == request.auth.uid ||
+          (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+            resource.data.uid == request.auth.uid)) &&
         validMember(request.resource.data) &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.uid == resource.data.uid;
@@ -189,6 +196,7 @@ service cloud.firestore {
         allow read: if isAuthed() && request.auth.uid == uid;
         allow write: if isAuthed() &&
           request.auth.uid == uid &&
+          request.auth.token.firebase.sign_in_provider != "anonymous" &&
           isSessionMember(sessionId);
       }
     }

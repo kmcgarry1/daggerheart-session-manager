@@ -143,13 +143,10 @@ const sendInvite = async ({
     if (!profileMatch) {
       throw new Error("No player found with that invite code.");
     }
-    if (profileMatch.uid === authStore.currentUser.value?.uid) {
+    
+    const fromUid = authStore.currentUser.value!.uid;
+    if (profileMatch.uid === fromUid) {
       throw new Error("You can't invite yourself.");
-    }
-
-    const fromUid = authStore.currentUser.value?.uid;
-    if (!fromUid) {
-      throw new Error("Sign in to send invites.");
     }
 
     await createInvite({
@@ -188,14 +185,11 @@ const sendInviteToUid = async ({
   if (!sessionStore.activeSession.value || !sessionStore.isHost.value) {
     throw new Error("You must be hosting an active session to invite.");
   }
-  if (toUid === authStore.currentUser.value?.uid) {
+  if (toUid === authStore.currentUser.value!.uid) {
     throw new Error("You can't invite yourself.");
   }
 
-  const fromUid = authStore.currentUser.value?.uid;
-  if (!fromUid) {
-    throw new Error("Sign in to send invites.");
-  }
+  const fromUid = authStore.currentUser.value!.uid;
 
   sendingInvite.value = true;
   sendInviteError.value = null;
