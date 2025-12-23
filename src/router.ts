@@ -1,11 +1,4 @@
 import { createRouter, createWebHistory } from "vue-router";
-const WelcomeView = () => import("./views/WelcomeView.vue");
-const LoginView = () => import("./views/LoginView.vue");
-const SignupView = () => import("./views/SignupView.vue");
-const CreateView = () => import("./views/CreateView.vue");
-const JoinView = () => import("./views/JoinView.vue");
-const SessionView = () => import("./views/SessionView.vue");
-const AccountView = () => import("./views/AccountView.vue");
 
 const router = createRouter({
   history: createWebHistory(),
@@ -13,39 +6,39 @@ const router = createRouter({
     {
       path: "/",
       name: "welcome",
-      component: WelcomeView,
+      component: () => import("./views/WelcomeView.vue"),
     },
     {
       path: "/login",
       name: "login",
-      component: LoginView,
+      component: () => import("./views/LoginView.vue"),
       meta: { hideNav: true },
     },
     {
       path: "/signup",
       name: "signup",
-      component: SignupView,
+      component: () => import("./views/SignupView.vue"),
       meta: { hideNav: true },
     },
     {
       path: "/create",
       name: "create",
-      component: CreateView,
+      component: () => import("./views/CreateView.vue"),
     },
     {
       path: "/join",
       name: "join",
-      component: JoinView,
+      component: () => import("./views/JoinView.vue"),
     },
     {
       path: "/session/:sessionId",
       name: "session",
-      component: SessionView,
+      component: () => import("./views/SessionView.vue"),
     },
     {
       path: "/account",
       name: "account",
-      component: AccountView,
+      component: () => import("./views/AccountView.vue"),
     },
   ],
 });
