@@ -94,7 +94,7 @@ const goToSession = () => {
           </span>
         </UiButton>
 
-        <div v-if="authStore.currentUser.value" class="user-chip">
+        <div v-if="authStore.isSignedIn.value" class="user-chip">
           <span class="user-name">{{ authStore.displayName.value }}</span>
           <UiButton
             variant="ghost"

@@ -12,6 +12,7 @@ import {
 import { useAuthStore } from "./authStore";
 import { useSessionStore } from "./sessionStore";
 
+const authStore = useAuthStore();
 const invites = ref<InviteData[]>([]);
 const invitesLoading = ref(false);
 const invitesError = ref<string | null>(null);
@@ -25,6 +26,10 @@ let initialized = false;
 let inviteUnsubscribe: (() => void) | null = null;
 let profileUnsubscribe: (() => void) | null = null;
 let stopWatcher: (() => void) | null = null;
+
+const signedInUid = computed(() =>
+  authStore.isSignedIn.value ? authStore.currentUser.value?.uid ?? null : null,
+);
 
 const pendingInvites = computed(() =>
   invites.value.filter((invite) => invite.status === "pending"),
@@ -55,10 +60,8 @@ const init = () => {
     return;
   }
   initialized = true;
-
-  const authStore = useAuthStore();
   stopWatcher = watch(
-    () => authStore.currentUser.value?.uid ?? null,
+    () => signedInUid.value,
     (uid) => {
       clearSubscriptions();
       invites.value = [];
@@ -121,7 +124,7 @@ const sendInvite = async ({
   const authStore = useAuthStore();
   const sessionStore = useSessionStore();
 
-  if (!authStore.currentUser.value) {
+  if (!authStore.isSignedIn.value) {
     throw new Error("Sign in to send invites.");
   }
   if (!sessionStore.activeSession.value || !sessionStore.isHost.value) {
@@ -140,13 +143,15 @@ const sendInvite = async ({
     if (!profileMatch) {
       throw new Error("No player found with that invite code.");
     }
-    if (profileMatch.uid === authStore.currentUser.value.uid) {
+    
+    const fromUid = authStore.currentUser.value!.uid;
+    if (profileMatch.uid === fromUid) {
       throw new Error("You can't invite yourself.");
     }
 
     await createInvite({
       toUid: profileMatch.uid,
-      fromUid: authStore.currentUser.value.uid,
+      fromUid,
       fromName: authStore.displayName.value,
       sessionId: sessionStore.activeSession.value.id,
       sessionName: sessionStore.activeSession.value.name ?? null,
@@ -174,22 +179,24 @@ const sendInviteToUid = async ({
   const authStore = useAuthStore();
   const sessionStore = useSessionStore();
 
-  if (!authStore.currentUser.value) {
+  if (!authStore.isSignedIn.value) {
     throw new Error("Sign in to send invites.");
   }
   if (!sessionStore.activeSession.value || !sessionStore.isHost.value) {
     throw new Error("You must be hosting an active session to invite.");
   }
-  if (toUid === authStore.currentUser.value.uid) {
+  if (toUid === authStore.currentUser.value!.uid) {
     throw new Error("You can't invite yourself.");
   }
+
+  const fromUid = authStore.currentUser.value!.uid;
 
   sendingInvite.value = true;
   sendInviteError.value = null;
   try {
     await createInvite({
       toUid,
-      fromUid: authStore.currentUser.value.uid,
+      fromUid,
       fromName: authStore.displayName.value,
       sessionId: sessionStore.activeSession.value.id,
       sessionName: sessionStore.activeSession.value.name ?? null,
@@ -228,7 +235,7 @@ const respond = async (invite: InviteData, status: InviteStatus) => {
 const acceptInvite = async (invite: InviteData) => {
   const authStore = useAuthStore();
   const sessionStore = useSessionStore();
-  if (!authStore.currentUser.value) {
+  if (!authStore.isSignedIn.value) {
     invitesError.value = "Sign in to accept invites.";
     return;
   }

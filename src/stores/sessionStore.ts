@@ -114,23 +114,26 @@ const createSessionFlow = async ({
   sessionName?: string;
 }) => {
   const authStore = useAuthStore();
+  await authStore.ensureGuestAuth();
   const trimmedHost = hostName.trim();
   if (!trimmedHost) {
     throw new Error("Host name is required.");
   }
 
+  const isGuest = !authStore.isSignedIn.value;
   const result = await createSession({
     hostName: trimmedHost,
     sessionName,
     hostUid: authStore.currentUser.value?.uid ?? null,
     hostMemberId: authStore.memberId.value,
+    hostIsGuest: isGuest,
   });
 
-  if (!authStore.currentUser.value) {
+  if (isGuest) {
     authStore.updateGuestName(trimmedHost);
   }
 
-  if (authStore.currentUser.value) {
+  if (authStore.isSignedIn.value) {
     await authStore.recordSession({
       sessionId: result.id,
       code: result.code,
@@ -155,6 +158,7 @@ const joinSessionFlow = async ({
   name: string;
 }) => {
   const authStore = useAuthStore();
+  await authStore.ensureGuestAuth();
   const session = await findSessionByCode(joinCode);
   if (!session) {
     throw new Error("That join code does not match an active session.");
@@ -176,19 +180,21 @@ const joinSessionFlow = async ({
   const role =
     session.host.memberId === authStore.memberId.value ? "host" : "player";
 
+  const isGuest = !authStore.isSignedIn.value;
   await joinSession({
     sessionId: session.id,
     memberId: authStore.memberId.value,
     name: trimmedName,
     uid: authStore.currentUser.value?.uid ?? null,
     role,
+    isGuest,
   });
 
-  if (!authStore.currentUser.value) {
+  if (isGuest) {
     authStore.updateGuestName(trimmedName);
   }
 
-  if (authStore.currentUser.value) {
+  if (authStore.isSignedIn.value) {
     await authStore.recordSession({
       sessionId: session.id,
       code: session.code,
@@ -215,6 +221,7 @@ const resumeSession = async ({
   fallbackName: string;
 }) => {
   const authStore = useAuthStore();
+  await authStore.ensureGuestAuth();
   const session = await fetchSessionById(sessionId);
   if (!session) {
     throw new Error("That session is no longer available.");
@@ -238,17 +245,20 @@ const resumeSession = async ({
     name: trimmedName,
     uid: authStore.currentUser.value?.uid ?? null,
     role: resolvedRole,
+    isGuest: !authStore.isSignedIn.value,
   });
 
-  await authStore.recordSession({
-    sessionId: session.id,
-    code: session.code,
-    name: session.name,
-    role: resolvedRole,
-    codeExpiresAt: session.codeExpiresAt,
-    sessionExpiresAt: session.sessionExpiresAt,
-  });
-  await authStore.refreshSavedSessions();
+  if (authStore.isSignedIn.value) {
+    await authStore.recordSession({
+      sessionId: session.id,
+      code: session.code,
+      name: session.name,
+      role: resolvedRole,
+      codeExpiresAt: session.codeExpiresAt,
+      sessionExpiresAt: session.sessionExpiresAt,
+    });
+    await authStore.refreshSavedSessions();
+  }
 
   activeSessionId.value = session.id;
   startSessionListeners(session.id);

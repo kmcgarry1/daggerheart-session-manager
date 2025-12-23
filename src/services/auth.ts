@@ -5,6 +5,7 @@ import {
   signInWithPopup,
   signInWithRedirect,
   signInWithEmailAndPassword,
+  signInAnonymously as firebaseSignInAnonymously,
   signOut,
   updateProfile,
 } from "firebase/auth";
@@ -69,6 +70,8 @@ export const signInWithApple = () => {
 
 export const signInWithEmail = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email, password);
+
+export const signInAnonymously = () => firebaseSignInAnonymously(auth);
 
 export const signUpWithEmail = async ({
   displayName,

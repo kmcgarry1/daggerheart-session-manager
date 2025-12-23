@@ -18,6 +18,31 @@ service cloud.firestore {
         sessionDoc(sessionId).data.sessionExpiresAt > request.time;
     }
 
+    function isSessionHost(sessionId) {
+      return isAuthed() &&
+        sessionExists(sessionId) &&
+        sessionDoc(sessionId).data.host.uid == request.auth.uid;
+    }
+
+    function isSessionMember(sessionId) {
+      return isAuthed() && (
+        exists(/databases/$(database)/documents/sessions/$(sessionId)/members/$(request.auth.uid)) ||
+        (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+          exists(/databases/$(database)/documents/sessions/$(sessionId)/members/$("guest-" + request.auth.uid)))
+      );
+    }
+
+    function hasSavedSession(sessionId) {
+      return isAuthed() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/sessions/$(sessionId));
+    }
+
+    function canJoinSession(sessionId) {
+      return sessionDoc(sessionId).data.codeExpiresAt > request.time ||
+        isSessionHost(sessionId) ||
+        hasSavedSession(sessionId);
+    }
+
     function isTimestamp(value) {
       return value is timestamp || value == request.time;
     }
@@ -88,10 +113,37 @@ service cloud.firestore {
         isTimestamp(data.updatedAt);
     }
 
+    match /sessionCodes/{code} {
+      allow get: if isAuthed();
+      allow list: if false;
+      allow create: if isAuthed() &&
+        code.size() == 6 &&
+        request.resource.data.sessionId is string &&
+        request.resource.data.codeExpiresAt is timestamp &&
+        request.resource.data.sessionExpiresAt is timestamp &&
+        request.resource.data.codeExpiresAt > request.time &&
+        request.resource.data.sessionExpiresAt > request.time &&
+        sessionDoc(request.resource.data.sessionId).data.code == code &&
+        sessionDoc(request.resource.data.sessionId).data.codeExpiresAt ==
+          request.resource.data.codeExpiresAt &&
+        sessionDoc(request.resource.data.sessionId).data.sessionExpiresAt ==
+          request.resource.data.sessionExpiresAt &&
+        isSessionHost(request.resource.data.sessionId);
+      allow update, delete: if false;
+    }
+
     match /sessions/{sessionId} {
-      allow read: if true;
-      allow create: if validSession(request.resource.data);
-      allow update: if sessionActive(sessionId) &&
+      allow get: if isAuthed() &&
+        sessionActive(sessionId) &&
+        (resource.data.codeExpiresAt > request.time ||
+          isSessionMember(sessionId) ||
+          (request.auth.token.firebase.sign_in_provider != "anonymous" && hasSavedSession(sessionId)));
+      allow list: if false;
+      allow create: if isAuthed() &&
+        validSession(request.resource.data) &&
+        request.resource.data.host.uid == request.auth.uid;
+      allow update: if isSessionHost(sessionId) &&
+        sessionActive(sessionId) &&
         request.resource.data.code == resource.data.code &&
         request.resource.data.name == resource.data.name &&
         request.resource.data.host == resource.data.host &&
@@ -104,9 +156,20 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId}/members/{memberId} {
-      allow read: if true;
-      allow create: if sessionActive(sessionId) && validMember(request.resource.data);
+      allow read: if isSessionMember(sessionId);
+      allow create: if sessionActive(sessionId) &&
+        isAuthed() &&
+        (memberId == request.auth.uid ||
+          (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+            memberId.matches("guest-.*") &&
+            request.resource.data.uid == request.auth.uid)) &&
+        validMember(request.resource.data) &&
+        canJoinSession(sessionId);
       allow update: if sessionActive(sessionId) &&
+        isAuthed() &&
+        (memberId == request.auth.uid ||
+          (request.auth.token.firebase.sign_in_provider == "anonymous" &&
+            resource.data.uid == request.auth.uid)) &&
         validMember(request.resource.data) &&
         request.resource.data.role == resource.data.role &&
         request.resource.data.uid == resource.data.uid;
@@ -114,20 +177,27 @@ service cloud.firestore {
     }
 
     match /sessions/{sessionId}/countdowns/{countdownId} {
-      allow read: if true;
-      allow create: if sessionActive(sessionId) && validCountdown(request.resource.data);
+      allow read: if isSessionMember(sessionId);
+      allow create: if sessionActive(sessionId) &&
+        isSessionHost(sessionId) &&
+        validCountdown(request.resource.data);
       allow update: if sessionActive(sessionId) &&
+        isSessionHost(sessionId) &&
         validCountdown(request.resource.data) &&
         request.resource.data.name == resource.data.name &&
         request.resource.data.max == resource.data.max;
-      allow delete: if sessionActive(sessionId);
+      allow delete: if sessionActive(sessionId) && isSessionHost(sessionId);
     }
 
     match /users/{uid} {
       allow read, write: if isAuthed() && request.auth.uid == uid;
 
       match /sessions/{sessionId} {
-        allow read, write: if isAuthed() && request.auth.uid == uid;
+        allow read: if isAuthed() && request.auth.uid == uid;
+        allow write: if isAuthed() &&
+          request.auth.uid == uid &&
+          request.auth.token.firebase.sign_in_provider != "anonymous" &&
+          isSessionMember(sessionId);
       }
     }
 

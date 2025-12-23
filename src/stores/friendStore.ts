@@ -28,7 +28,9 @@ const clearSubscriptions = () => {
 };
 
 const authStore = useAuthStore();
-const currentUid = computed(() => authStore.currentUser.value?.uid ?? null);
+const currentUid = computed(() =>
+  authStore.isSignedIn.value ? authStore.currentUser.value?.uid ?? null : null,
+);
 
 const pendingRequests = computed(() =>
   friendships.value.filter((friendship) => friendship.status === "pending"),
@@ -114,7 +116,7 @@ const dispose = () => {
 };
 
 const sendRequest = async (inviteCode: string) => {
-  if (!authStore.currentUser.value) {
+  if (!authStore.isSignedIn.value) {
     throw new Error("Sign in to add friends.");
   }
 
@@ -130,7 +132,7 @@ const sendRequest = async (inviteCode: string) => {
     if (!profileMatch) {
       throw new Error("No player found with that invite code.");
     }
-    if (profileMatch.uid === authStore.currentUser.value.uid) {
+    if (profileMatch.uid === authStore.currentUser.value?.uid) {
       throw new Error("You can't add yourself.");
     }
     const existing = friendships.value.find((friendship) =>
@@ -141,7 +143,7 @@ const sendRequest = async (inviteCode: string) => {
         throw new Error("You're already friends.");
       }
       if (existing.status === "pending") {
-        if (existing.requesterUid === authStore.currentUser.value.uid) {
+        if (existing.requesterUid === authStore.currentUser.value?.uid) {
           throw new Error("Friend request already sent.");
         }
         throw new Error("They already sent you a friend request.");
@@ -149,10 +151,11 @@ const sendRequest = async (inviteCode: string) => {
       throw new Error("That request was closed. Ask them to send a new one.");
     }
 
+    const fromUid = authStore.currentUser.value!.uid;
     await sendFriendRequest({
-      fromUid: authStore.currentUser.value.uid,
+      fromUid,
       fromName: authStore.displayName.value,
-      fromPhotoURL: authStore.currentUser.value.photoURL ?? null,
+      fromPhotoURL: authStore.currentUser.value?.photoURL ?? null,
       toUid: profileMatch.uid,
       toName: profileMatch.displayName ?? "Player",
       toPhotoURL: profileMatch.photoURL ?? null,

@@ -58,9 +58,9 @@ const handleEmailSignIn = async () => {
 };
 
 watch(
-  () => authStore.currentUser.value,
-  (user) => {
-    if (user) {
+  () => authStore.isSignedIn.value,
+  (signedIn) => {
+    if (signedIn) {
       router.replace("/account");
     }
   },

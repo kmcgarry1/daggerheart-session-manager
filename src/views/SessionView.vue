@@ -84,7 +84,7 @@ const handleAddCountdown = async () => {
       name: authStore.displayName.value,
       uid: authStore.currentUser.value?.uid ?? null,
       memberId: authStore.memberId.value,
-      isGuest: !authStore.currentUser.value,
+      isGuest: !authStore.isSignedIn.value,
     },
   });
 
