@@ -151,10 +151,7 @@ const sendRequest = async (inviteCode: string) => {
       throw new Error("That request was closed. Ask them to send a new one.");
     }
 
-    const fromUid = authStore.currentUser.value?.uid;
-    if (!fromUid) {
-      throw new Error("Sign in to add friends.");
-    }
+    const fromUid = authStore.currentUser.value!.uid;
     await sendFriendRequest({
       fromUid,
       fromName: authStore.displayName.value,
