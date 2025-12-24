@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Flame } from "lucide-vue-next";
+import { Flame, Skull } from "lucide-vue-next";
 import UiButton from "./ui/UiButton.vue";
 import UiPanelTitle from "./ui/UiPanelTitle.vue";
 
@@ -18,11 +18,15 @@ const emit = defineEmits<{
 
 const maxValue = computed(() => props.max ?? 12);
 const levels = computed(() =>
-  Array.from({ length: maxValue.value + 1 }, (_, index) => index),
+  Array.from({ length: maxValue.value }, (_, index) => index + 1)
 );
 const clampedValue = computed(() =>
-  Math.min(Math.max(props.value, 0), maxValue.value),
+  Math.min(Math.max(props.value, 0), maxValue.value)
 );
+const fillPercent = computed(() => {
+  const safeMax = Math.max(maxValue.value, 1);
+  return `${(clampedValue.value / safeMax) * 100}%`;
+});
 
 const decrement = () => emit("set", clampedValue.value - 1);
 const increment = () => emit("set", clampedValue.value + 1);
@@ -40,48 +44,66 @@ const increment = () => emit("set", clampedValue.value + 1);
           <h2>Fear commands the table</h2>
         </div>
       </UiPanelTitle>
-      <UiButton variant="ghost" size="compact" type="button" @click="emit('toggle')">
+      <UiButton
+        variant="ghost"
+        size="compact"
+        type="button"
+        @click="emit('toggle')"
+      >
         {{ minimized ? "Expand" : "Minimize" }}
       </UiButton>
     </header>
 
     <div v-if="!minimized" class="fear-body">
-      <div
-      class="fear-dial"
-      :style="{
-        '--count': levels.length,
-        '--radius': 'var(--fear-radius)',
-        '--dot-size': 'var(--fear-dot)',
-      }"
-    >
-        <div class="fear-core">
-          <span class="meta">Current fear</span>
-          <strong>{{ clampedValue }}</strong>
-          <span class="meta">/ {{ maxValue }}</span>
+      <div class="fear-tracker tracker">
+        <div class="tracker-header">
+          <span class="meta-label">Current fear</span>
+          <div class="tracker-value">
+            <strong>{{ clampedValue }}</strong>
+            <span class="meta">/ {{ maxValue }}</span>
+          </div>
         </div>
-        <button
-          v-for="level in levels"
-          :key="level"
-          class="fear-marker"
-          :class="{
-            'is-filled': level <= clampedValue,
-            'is-active': level === clampedValue,
+        <div
+          class="tracker-bar"
+          :style="{
+            '--count': levels.length,
+            '--fill': fillPercent,
           }"
-          :style="{ '--i': level }"
-          type="button"
-          :disabled="!canEdit"
-          :aria-label="`Set fear to ${level}`"
-          @click="emit('set', level)"
         >
-          <span>{{ level }}</span>
-        </button>
+          <div class="tracker-fill" aria-hidden="true"></div>
+          <div class="tracker-segments">
+            <button
+              v-for="level in levels"
+              :key="level"
+              class="tracker-segment"
+              :class="{
+                'is-filled': level <= clampedValue,
+                'is-active': level === clampedValue,
+              }"
+              type="button"
+              :disabled="!canEdit"
+              :aria-label="`Set fear to ${level}`"
+              @click="emit('set', level)"
+            >
+              <span class="icon tracker-icon" aria-hidden="true">
+                <Skull />
+              </span>
+            </button>
+          </div>
+        </div>
+        <div class="tracker-labels">
+          <span class="meta">0</span>
+          <span class="meta">{{ maxValue }}</span>
+        </div>
       </div>
 
       <div v-if="canEdit" class="fear-controls">
         <UiButton variant="subtle" type="button" @click="decrement">
+          <span class="icon"><Skull /></span>
           Lower
         </UiButton>
         <UiButton variant="primary" type="button" @click="increment">
+          <span class="icon"><Skull /></span>
           Raise
         </UiButton>
       </div>
