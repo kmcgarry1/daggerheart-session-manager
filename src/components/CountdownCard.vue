@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Hourglass, Trash2 } from "lucide-vue-next";
+import { Clock, Hourglass, Trash2 } from "lucide-vue-next";
 import UiButton from "./ui/UiButton.vue";
 import UiCard from "./ui/UiCard.vue";
 import type { CountdownData } from "../services/sessions";
@@ -15,22 +15,16 @@ const emit = defineEmits<{
   (e: "remove"): void;
 }>();
 
-const levels = computed(() =>
-  Array.from({ length: props.countdown.max + 1 }, (_, index) => index),
+const maxValue = computed(() => Math.max(props.countdown.max, 1));
+const clampedValue = computed(() =>
+  Math.min(Math.max(props.countdown.value, 0), maxValue.value),
 );
-
-const radius = computed(() => {
-  if (levels.value.length <= 8) return 54;
-  if (levels.value.length <= 12) return 62;
-  if (levels.value.length <= 18) return 70;
-  return 78;
-});
-
-const dotSize = computed(() => {
-  if (levels.value.length <= 10) return 22;
-  if (levels.value.length <= 14) return 18;
-  return 16;
-});
+const levels = computed(() =>
+  Array.from({ length: maxValue.value }, (_, index) => index + 1),
+);
+const fillPercent = computed(
+  () => `${(clampedValue.value / maxValue.value) * 100}%`,
+);
 
 const clampValue = (value: number) =>
   Math.min(Math.max(value, 0), props.countdown.max);
@@ -62,40 +56,52 @@ const increment = () => emit("set", clampValue(props.countdown.value + 1));
       </UiButton>
     </div>
 
-    <div
-      class="countdown-radial"
-      :style="{
-        '--count': levels.length,
-        '--radius': `${radius}px`,
-        '--dot-size': `${dotSize}px`,
-      }"
-    >
-      <div class="radial-center">
+    <div class="countdown-tracker tracker">
+      <div class="tracker-header">
         <span class="meta-label">Current</span>
-        <strong>{{ countdown.value }}</strong>
+        <div class="tracker-value">
+          <strong>{{ clampedValue }}</strong>
+          <span class="meta">/ {{ countdown.max }}</span>
+        </div>
       </div>
-      <button
-        v-for="level in levels"
-        :key="level"
-        class="radial-dot"
-        :class="{
-          'is-filled': level <= countdown.value,
-          'is-active': level === countdown.value,
+      <div
+        class="tracker-bar"
+        :style="{
+          '--count': levels.length,
+          '--fill': fillPercent,
         }"
-        :style="{ '--i': level }"
-        :disabled="!canEdit"
-        type="button"
-        :aria-label="`Set countdown to ${level}`"
-        @click="emit('set', level)"
       >
-        <span>{{ level }}</span>
-      </button>
+        <div class="tracker-fill" aria-hidden="true"></div>
+        <div class="tracker-segments">
+          <button
+            v-for="level in levels"
+            :key="level"
+            class="tracker-segment"
+            :class="{
+              'is-filled': level <= clampedValue,
+              'is-active': level === clampedValue,
+            }"
+            :disabled="!canEdit"
+            type="button"
+            :aria-label="`Set countdown to ${level}`"
+            @click="emit('set', level)"
+          >
+            <span class="icon tracker-icon" aria-hidden="true">
+              <Clock />
+            </span>
+          </button>
+        </div>
+      </div>
+      <div class="tracker-labels">
+        <span class="meta">0</span>
+        <span class="meta">{{ countdown.max }}</span>
+      </div>
     </div>
 
     <div class="countdown-footer">
       <div class="countdown-meta">
         <span class="meta">Max {{ countdown.max }}</span>
-        <span class="meta">Current {{ countdown.value }}</span>
+        <span class="meta">Current {{ clampedValue }}</span>
       </div>
       <div v-if="canEdit" class="countdown-controls">
         <UiButton variant="ghost" size="compact" type="button" @click="decrement">

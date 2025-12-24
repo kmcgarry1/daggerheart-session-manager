@@ -17,7 +17,11 @@ import {
 const authStore = useAuthStore();
 const fearPreviewMax = 12;
 const fearPreviewValue = 6;
-const fearPreview = Array.from({ length: fearPreviewMax + 1 }, (_, index) => index);
+const fearPreview = Array.from(
+  { length: fearPreviewMax },
+  (_, index) => index + 1,
+);
+const fearPreviewFill = `${(fearPreviewValue / fearPreviewMax) * 100}%`;
 </script>
 
 <template>
@@ -158,26 +162,31 @@ const fearPreview = Array.from({ length: fearPreviewMax + 1 }, (_, index) => ind
       </div>
       <UiCard variant="spotlight-card">
         <div class="fear-preview">
+          <div class="fear-preview-readout">
+            <span class="meta">Fear</span>
+            <strong>{{ fearPreviewValue }}</strong>
+            <span class="meta">/ {{ fearPreviewMax }}</span>
+          </div>
           <div
-            class="fear-preview-dial"
-            :style="{ '--count': fearPreview.length }"
+            class="fear-preview-bar tracker-bar"
+            :style="{
+              '--count': fearPreview.length,
+              '--fill': fearPreviewFill,
+            }"
           >
-            <div class="fear-preview-core">
-              <span class="meta">Fear</span>
-              <strong>{{ fearPreviewValue }}</strong>
-              <span class="meta">/ {{ fearPreviewMax }}</span>
+            <div class="tracker-fill" aria-hidden="true"></div>
+            <div class="tracker-segments">
+              <span
+                v-for="level in fearPreview"
+                :key="level"
+                class="tracker-segment"
+                :class="{
+                  'is-filled': level <= fearPreviewValue,
+                  'is-active': level === fearPreviewValue,
+                }"
+                aria-hidden="true"
+              ></span>
             </div>
-            <span
-              v-for="level in fearPreview"
-              :key="level"
-              class="fear-preview-dot"
-              :class="{
-                'is-filled': level <= fearPreviewValue,
-                'is-active': level === fearPreviewValue,
-              }"
-              :style="{ '--i': level }"
-              aria-hidden="true"
-            ></span>
           </div>
           <div class="fear-preview-footer">
             <div class="fear-preview-pill">
