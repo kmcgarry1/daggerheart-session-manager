@@ -45,8 +45,9 @@ const membersWithPresence = computed(() => {
   const staleThreshold = now - STALE_MEMBER_THRESHOLD_MS;
   
   return members.value.map((member) => {
-    const lastSeenTime = member.lastSeenAt?.getTime() ?? 0;
-    const isActive = lastSeenTime > staleThreshold;
+    const lastSeenTime = member.lastSeenAt?.getTime();
+    // Members without lastSeenAt just joined and haven't had a heartbeat yet - consider them active
+    const isActive = !lastSeenTime || lastSeenTime > staleThreshold;
     
     return {
       ...member,
@@ -147,15 +148,16 @@ const startSessionListeners = (sessionId: string) => {
   }, HEARTBEAT_INTERVAL_MS);
 
   // Cleanup stale members periodically (only host does this)
-  if (isHost.value) {
-    staleCleanupInterval = setInterval(async () => {
+  staleCleanupInterval = setInterval(async () => {
+    // Check host status on each interval in case it changes
+    if (isHost.value) {
       try {
         await removeStaleMembers(sessionId);
       } catch (error) {
         console.error("Failed to cleanup stale members:", error);
       }
-    }, HEARTBEAT_INTERVAL_MS);
-  }
+    }
+  }, HEARTBEAT_INTERVAL_MS);
 };
 
 const createSessionFlow = async ({

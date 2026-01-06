@@ -444,12 +444,6 @@ export const updateMemberHeartbeat = async (
 
 export const removeStaleMembers = async (sessionId: string) => {
   const membersRef = collection(db, SESSION_COLLECTION, sessionId, "members");
-  const snapshot = await getDoc(doc(db, SESSION_COLLECTION, sessionId));
-  
-  if (!snapshot.exists()) {
-    return;
-  }
-
   const membersSnapshot = await getDocs(membersRef);
   const now = Date.now();
   const staleThreshold = now - STALE_MEMBER_THRESHOLD_MS;
@@ -457,7 +451,13 @@ export const removeStaleMembers = async (sessionId: string) => {
   const deletePromises = membersSnapshot.docs
     .filter((memberDoc) => {
       const data = memberDoc.data() as MemberDoc;
-      const lastSeen = data.lastSeenAt?.toDate()?.getTime() ?? 0;
+      const lastSeen = data.lastSeenAt?.toDate()?.getTime();
+      
+      // Skip members without lastSeenAt - they just joined and haven't had a heartbeat yet
+      if (!lastSeen) {
+        return false;
+      }
+      
       return lastSeen < staleThreshold;
     })
     .map((memberDoc) =>
