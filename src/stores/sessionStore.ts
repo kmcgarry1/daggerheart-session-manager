@@ -20,6 +20,7 @@ import {
   type SessionData,
 } from "../services/sessions";
 import { useAuthStore } from "./authStore";
+import { reportError, trackFlow } from "../monitoring";
 
 const activeSessionId = ref<string | null>(null);
 const activeSession = ref<SessionData | null>(null);
@@ -107,7 +108,7 @@ const startSessionListeners = (sessionId: string) => {
       sessionError.value = null;
     },
     (error) => {
-      console.error(error);
+      reportError(error, { flow: "session.subscribe", action: "session" });
       sessionError.value = "Unable to sync the session.";
       sessionLoading.value = false;
     },
@@ -119,7 +120,7 @@ const startSessionListeners = (sessionId: string) => {
       countdowns.value = nextCountdowns;
     },
     (error) => {
-      console.error(error);
+      reportError(error, { flow: "session.subscribe", action: "countdowns" });
       sessionError.value = "Unable to load countdowns.";
     },
   );
@@ -130,7 +131,7 @@ const startSessionListeners = (sessionId: string) => {
       members.value = nextMembers;
     },
     (error) => {
-      console.error(error);
+      reportError(error, { flow: "session.subscribe", action: "members" });
       sessionError.value = "Unable to load session members.";
     },
   );
@@ -168,40 +169,55 @@ const createSessionFlow = async ({
   sessionName?: string;
 }) => {
   const authStore = useAuthStore();
-  await authStore.ensureGuestAuth();
   const trimmedHost = hostName.trim();
   if (!trimmedHost) {
+    trackFlow("session.create", "failure", { reason: "missing_host" });
     throw new Error("Host name is required.");
   }
 
-  const isGuest = !authStore.isSignedIn.value;
-  const result = await createSession({
-    hostName: trimmedHost,
-    sessionName,
-    hostUid: authStore.currentUser.value?.uid ?? null,
-    hostMemberId: authStore.memberId.value,
-    hostIsGuest: isGuest,
-  });
-
-  if (isGuest) {
-    authStore.updateGuestName(trimmedHost);
-  }
-
-  if (authStore.isSignedIn.value) {
-    await authStore.recordSession({
-      sessionId: result.id,
-      code: result.code,
-      name: sessionName?.trim() || null,
-      role: "host",
-      codeExpiresAt: result.codeExpiresAt,
-      sessionExpiresAt: result.sessionExpiresAt,
+  const hasSessionName = Boolean(sessionName?.trim());
+  let isGuest: boolean | undefined;
+  try {
+    await authStore.ensureGuestAuth();
+    isGuest = !authStore.isSignedIn.value;
+    const result = await createSession({
+      hostName: trimmedHost,
+      sessionName,
+      hostUid: authStore.currentUser.value?.uid ?? null,
+      hostMemberId: authStore.memberId.value,
+      hostIsGuest: isGuest,
     });
-    await authStore.refreshSavedSessions();
-  }
 
-  activeSessionId.value = result.id;
-  startSessionListeners(result.id);
-  return result.id;
+    if (isGuest) {
+      authStore.updateGuestName(trimmedHost);
+    }
+
+    if (authStore.isSignedIn.value) {
+      await authStore.recordSession({
+        sessionId: result.id,
+        code: result.code,
+        name: sessionName?.trim() || null,
+        role: "host",
+        codeExpiresAt: result.codeExpiresAt,
+        sessionExpiresAt: result.sessionExpiresAt,
+      });
+      await authStore.refreshSavedSessions();
+    }
+
+    activeSessionId.value = result.id;
+    startSessionListeners(result.id);
+    trackFlow("session.create", "success", { isGuest, hasSessionName });
+    return result.id;
+  } catch (error) {
+    const code = (error as { code?: string }).code ?? null;
+    reportError(error, { flow: "session.create", action: "create", code });
+    trackFlow("session.create", "failure", {
+      isGuest,
+      hasSessionName,
+      code: code ?? "unknown",
+    });
+    throw error;
+  }
 };
 
 const joinSessionFlow = async ({
@@ -212,57 +228,63 @@ const joinSessionFlow = async ({
   name: string;
 }) => {
   const authStore = useAuthStore();
-  await authStore.ensureGuestAuth();
-  const session = await findSessionByCode(joinCode);
-  if (!session) {
-    throw new Error("That join code does not match an active session.");
-  }
+  try {
+    await authStore.ensureGuestAuth();
+    const session = await findSessionByCode(joinCode);
+    if (!session) {
+      throw new Error("That join code does not match an active session.");
+    }
 
-  if (isExpired(session.sessionExpiresAt)) {
-    throw new Error("That session has expired.");
-  }
+    if (isExpired(session.sessionExpiresAt)) {
+      throw new Error("That session has expired.");
+    }
 
-  if (isExpired(session.codeExpiresAt)) {
-    throw new Error("That join code has expired.");
-  }
+    if (isExpired(session.codeExpiresAt)) {
+      throw new Error("That join code has expired.");
+    }
 
-  const trimmedName = name.trim();
-  if (!trimmedName) {
-    throw new Error("Display name is required.");
-  }
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      throw new Error("Display name is required.");
+    }
 
-  const role =
-    session.host.memberId === authStore.memberId.value ? "host" : "player";
+    const role =
+      session.host.memberId === authStore.memberId.value ? "host" : "player";
 
-  const isGuest = !authStore.isSignedIn.value;
-  await joinSession({
-    sessionId: session.id,
-    memberId: authStore.memberId.value,
-    name: trimmedName,
-    uid: authStore.currentUser.value?.uid ?? null,
-    role,
-    isGuest,
-  });
-
-  if (isGuest) {
-    authStore.updateGuestName(trimmedName);
-  }
-
-  if (authStore.isSignedIn.value) {
-    await authStore.recordSession({
+    const isGuest = !authStore.isSignedIn.value;
+    await joinSession({
       sessionId: session.id,
-      code: session.code,
-      name: session.name,
+      memberId: authStore.memberId.value,
+      name: trimmedName,
+      uid: authStore.currentUser.value?.uid ?? null,
       role,
-      codeExpiresAt: session.codeExpiresAt,
-      sessionExpiresAt: session.sessionExpiresAt,
+      isGuest,
     });
-    await authStore.refreshSavedSessions();
-  }
 
-  activeSessionId.value = session.id;
-  startSessionListeners(session.id);
-  return session.id;
+    if (isGuest) {
+      authStore.updateGuestName(trimmedName);
+    }
+
+    if (authStore.isSignedIn.value) {
+      await authStore.recordSession({
+        sessionId: session.id,
+        code: session.code,
+        name: session.name,
+        role,
+        codeExpiresAt: session.codeExpiresAt,
+        sessionExpiresAt: session.sessionExpiresAt,
+      });
+      await authStore.refreshSavedSessions();
+    }
+
+    activeSessionId.value = session.id;
+    startSessionListeners(session.id);
+    return session.id;
+  } catch (error) {
+    const code = (error as { code?: string }).code ?? null;
+    reportError(error, { flow: "session.join", action: "join", code });
+    throw error;
+  }
 };
 
 const resumeSession = async ({
@@ -275,48 +297,54 @@ const resumeSession = async ({
   fallbackName: string;
 }) => {
   const authStore = useAuthStore();
-  await authStore.ensureGuestAuth();
-  const session = await fetchSessionById(sessionId);
-  if (!session) {
-    throw new Error("That session is no longer available.");
-  }
+  try {
+    await authStore.ensureGuestAuth();
+    const session = await fetchSessionById(sessionId);
+    if (!session) {
+      throw new Error("That session is no longer available.");
+    }
 
-  if (isExpired(session.sessionExpiresAt)) {
-    throw new Error("That session has expired.");
-  }
+    if (isExpired(session.sessionExpiresAt)) {
+      throw new Error("That session has expired.");
+    }
 
-  const trimmedName = fallbackName.trim();
-  if (!trimmedName) {
-    throw new Error("Enter a display name before resuming.");
-  }
+    const trimmedName = fallbackName.trim();
+    if (!trimmedName) {
+      throw new Error("Enter a display name before resuming.");
+    }
 
-  const resolvedRole =
-    session.host.memberId === authStore.memberId.value ? "host" : role;
+    const resolvedRole =
+      session.host.memberId === authStore.memberId.value ? "host" : role;
 
-  await joinSession({
-    sessionId: session.id,
-    memberId: authStore.memberId.value,
-    name: trimmedName,
-    uid: authStore.currentUser.value?.uid ?? null,
-    role: resolvedRole,
-    isGuest: !authStore.isSignedIn.value,
-  });
-
-  if (authStore.isSignedIn.value) {
-    await authStore.recordSession({
+    await joinSession({
       sessionId: session.id,
-      code: session.code,
-      name: session.name,
+      memberId: authStore.memberId.value,
+      name: trimmedName,
+      uid: authStore.currentUser.value?.uid ?? null,
       role: resolvedRole,
-      codeExpiresAt: session.codeExpiresAt,
-      sessionExpiresAt: session.sessionExpiresAt,
+      isGuest: !authStore.isSignedIn.value,
     });
-    await authStore.refreshSavedSessions();
-  }
 
-  activeSessionId.value = session.id;
-  startSessionListeners(session.id);
-  return session.id;
+    if (authStore.isSignedIn.value) {
+      await authStore.recordSession({
+        sessionId: session.id,
+        code: session.code,
+        name: session.name,
+        role: resolvedRole,
+        codeExpiresAt: session.codeExpiresAt,
+        sessionExpiresAt: session.sessionExpiresAt,
+      });
+      await authStore.refreshSavedSessions();
+    }
+
+    activeSessionId.value = session.id;
+    startSessionListeners(session.id);
+    return session.id;
+  } catch (error) {
+    const code = (error as { code?: string }).code ?? null;
+    reportError(error, { flow: "session.resume", action: "resume", code });
+    throw error;
+  }
 };
 
 const leaveSession = () => {
@@ -334,7 +362,7 @@ const setFear = async (value: number) => {
   try {
     await updateFear(activeSessionId.value, value);
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "session.fear", action: "update" });
     sessionError.value = "Unable to update fear right now.";
   }
 };
@@ -376,7 +404,7 @@ const addSessionCountdown = async ({
       createdBy,
     });
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "session.countdown", action: "add" });
     countdownError.value = "Unable to add that countdown.";
   }
 };
@@ -390,7 +418,7 @@ const setCountdown = async (countdown: CountdownData, value: number) => {
   try {
     await updateCountdown(activeSessionId.value, countdown.id, nextValue);
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "session.countdown", action: "update" });
     sessionError.value = "Unable to update countdown.";
   }
 };
@@ -403,7 +431,7 @@ const deleteCountdown = async (countdown: CountdownData) => {
   try {
     await removeCountdown(activeSessionId.value, countdown.id);
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "session.countdown", action: "delete" });
     sessionError.value = "Unable to remove countdown.";
   }
 };

@@ -11,6 +11,7 @@ import UiField from "../components/ui/UiField.vue";
 import UiInput from "../components/ui/UiInput.vue";
 import UiPanelHeader from "../components/ui/UiPanelHeader.vue";
 import UiPanelTitle from "../components/ui/UiPanelTitle.vue";
+import { reportError } from "../monitoring";
 import {
   Bell,
   ClipboardCopy,
@@ -59,7 +60,7 @@ const handleCopyInviteCode = async () => {
     await navigator.clipboard.writeText(inviteCode.value);
     inviteCopyStatus.value = "copied";
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "clipboard", action: "copy_invite_code" });
     inviteCopyStatus.value = "failed";
   } finally {
     window.setTimeout(() => {

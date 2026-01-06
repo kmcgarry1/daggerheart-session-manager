@@ -55,7 +55,6 @@ const handleJoin = async () => {
     });
     router.push(`/session/${sessionId}`);
   } catch (err) {
-    console.error(err);
     error.value = (err as Error).message || "Unable to join that session.";
   } finally {
     joining.value = false;
@@ -73,7 +72,6 @@ const handleResume = async (sessionId: string, role: "host" | "player") => {
     });
     router.push(`/session/${targetId}`);
   } catch (err) {
-    console.error(err);
     error.value = (err as Error).message || "Unable to resume that session.";
   } finally {
     joining.value = false;
