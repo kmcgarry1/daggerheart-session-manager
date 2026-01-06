@@ -251,16 +251,16 @@ const handleAddCountdown = async () => {
               <div>
                 <h3>Roster</h3>
                 <p class="lede small">
-                  {{ sessionStore.members.value.length }} in session
+                  {{ sessionStore.membersWithPresence.value.length }} in session
                 </p>
               </div>
             </UiPanelTitle>
-            <ul v-if="sessionStore.members.value.length" class="roster-list">
+            <ul v-if="sessionStore.membersWithPresence.value.length" class="roster-list">
               <li
-                v-for="member in sessionStore.members.value"
+                v-for="member in sessionStore.membersWithPresence.value"
                 :key="member.id"
                 class="roster-item"
-                :class="{ 'is-host': member.role === 'host' }"
+                :class="{ 'is-host': member.role === 'host', 'is-inactive': !member.isActive }"
               >
                 <div>
                   <strong>{{ member.name }}</strong>
@@ -272,12 +272,21 @@ const handleAddCountdown = async () => {
                     {{ member.role === "host" ? "Host" : "Player" }}
                   </span>
                 </div>
-                <span
-                  class="roster-badge"
-                  :class="member.isGuest ? 'guest' : 'signed-in'"
-                >
-                  {{ member.isGuest ? "Guest" : "Signed in" }}
-                </span>
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                  <span
+                    v-if="!member.isActive"
+                    class="roster-badge inactive"
+                    title="Member appears inactive"
+                  >
+                    Inactive
+                  </span>
+                  <span
+                    class="roster-badge"
+                    :class="member.isGuest ? 'guest' : 'signed-in'"
+                  >
+                    {{ member.isGuest ? "Guest" : "Signed in" }}
+                  </span>
+                </div>
               </li>
             </ul>
             <p v-else class="panel-footer">No members yet.</p>
