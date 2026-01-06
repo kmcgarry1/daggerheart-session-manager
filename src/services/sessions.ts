@@ -5,6 +5,7 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
@@ -21,6 +22,10 @@ const CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const CODE_TTL_MS = 60 * 60 * 1000;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const CODE_ATTEMPTS = 5;
+const HEARTBEAT_INTERVAL_MS = 30 * 1000; // 30 seconds
+const STALE_MEMBER_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+
+export { HEARTBEAT_INTERVAL_MS, STALE_MEMBER_THRESHOLD_MS };
 
 export type SessionHost = {
   name: string;
@@ -427,3 +432,37 @@ export const removeCountdown = async (
   countdownId: string,
 ) =>
   deleteDoc(doc(db, SESSION_COLLECTION, sessionId, "countdowns", countdownId));
+
+export const updateMemberHeartbeat = async (
+  sessionId: string,
+  memberId: string,
+) => {
+  await updateDoc(doc(db, SESSION_COLLECTION, sessionId, "members", memberId), {
+    lastSeenAt: serverTimestamp(),
+  });
+};
+
+export const removeStaleMembers = async (sessionId: string) => {
+  const membersRef = collection(db, SESSION_COLLECTION, sessionId, "members");
+  const snapshot = await getDoc(doc(db, SESSION_COLLECTION, sessionId));
+  
+  if (!snapshot.exists()) {
+    return;
+  }
+
+  const membersSnapshot = await getDocs(membersRef);
+  const now = Date.now();
+  const staleThreshold = now - STALE_MEMBER_THRESHOLD_MS;
+
+  const deletePromises = membersSnapshot.docs
+    .filter((memberDoc) => {
+      const data = memberDoc.data() as MemberDoc;
+      const lastSeen = data.lastSeenAt?.toDate()?.getTime() ?? 0;
+      return lastSeen < staleThreshold;
+    })
+    .map((memberDoc) =>
+      deleteDoc(doc(db, SESSION_COLLECTION, sessionId, "members", memberDoc.id)),
+    );
+
+  await Promise.all(deletePromises);
+};

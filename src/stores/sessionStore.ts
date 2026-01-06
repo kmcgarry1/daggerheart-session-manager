@@ -1,16 +1,20 @@
 import { computed, ref } from "vue";
 import {
+  HEARTBEAT_INTERVAL_MS,
+  STALE_MEMBER_THRESHOLD_MS,
   addCountdown,
   createSession,
   fetchSessionById,
   findSessionByCode,
   joinSession,
   removeCountdown,
+  removeStaleMembers,
   subscribeToCountdowns,
   subscribeToMembers,
   subscribeToSession,
   updateCountdown,
   updateFear,
+  updateMemberHeartbeat,
   type CountdownData,
   type MemberData,
   type SessionData,
@@ -28,10 +32,27 @@ const countdownError = ref<string | null>(null);
 let sessionUnsubscribe: (() => void) | null = null;
 let countdownUnsubscribe: (() => void) | null = null;
 let membersUnsubscribe: (() => void) | null = null;
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+let staleCleanupInterval: ReturnType<typeof setInterval> | null = null;
 
 const isHost = computed(() => {
   const authStore = useAuthStore();
   return activeSession.value?.host.memberId === authStore.memberId.value;
+});
+
+const membersWithPresence = computed(() => {
+  const now = Date.now();
+  const staleThreshold = now - STALE_MEMBER_THRESHOLD_MS;
+  
+  return members.value.map((member) => {
+    const lastSeenTime = member.lastSeenAt?.getTime() ?? 0;
+    const isActive = lastSeenTime > staleThreshold;
+    
+    return {
+      ...member,
+      isActive,
+    };
+  });
 });
 
 const clearSubscriptions = () => {
@@ -46,6 +67,14 @@ const clearSubscriptions = () => {
   if (membersUnsubscribe) {
     membersUnsubscribe();
     membersUnsubscribe = null;
+  }
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+    heartbeatInterval = null;
+  }
+  if (staleCleanupInterval) {
+    clearInterval(staleCleanupInterval);
+    staleCleanupInterval = null;
   }
 };
 
@@ -104,6 +133,29 @@ const startSessionListeners = (sessionId: string) => {
       sessionError.value = "Unable to load session members.";
     },
   );
+
+  const authStore = useAuthStore();
+  const memberId = authStore.memberId.value;
+
+  // Start heartbeat to update lastSeenAt periodically
+  heartbeatInterval = setInterval(async () => {
+    try {
+      await updateMemberHeartbeat(sessionId, memberId);
+    } catch (error) {
+      console.error("Failed to update heartbeat:", error);
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+
+  // Cleanup stale members periodically (only host does this)
+  if (isHost.value) {
+    staleCleanupInterval = setInterval(async () => {
+      try {
+        await removeStaleMembers(sessionId);
+      } catch (error) {
+        console.error("Failed to cleanup stale members:", error);
+      }
+    }, HEARTBEAT_INTERVAL_MS);
+  }
 };
 
 const createSessionFlow = async ({
@@ -359,6 +411,7 @@ export const useSessionStore = () => ({
   activeSession,
   countdowns,
   members,
+  membersWithPresence,
   sessionError,
   sessionLoading,
   countdownError,
