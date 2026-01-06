@@ -44,7 +44,6 @@ const handleCreate = async () => {
     });
     router.push(`/session/${sessionId}`);
   } catch (err) {
-    console.error(err);
     error.value = (err as Error).message || "Unable to create the session.";
   } finally {
     creating.value = false;

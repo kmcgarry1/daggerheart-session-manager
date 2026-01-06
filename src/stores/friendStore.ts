@@ -8,6 +8,7 @@ import {
   type FriendshipStatus,
 } from "../services/friends";
 import { fetchPublicProfileByInviteCode } from "../services/invites";
+import { reportError } from "../monitoring";
 
 const friendships = ref<FriendshipData[]>([]);
 const loading = ref(false);
@@ -96,7 +97,7 @@ const init = () => {
           loading.value = false;
         },
         (err) => {
-          console.error(err);
+          reportError(err, { flow: "friend.subscribe", action: "friends" });
           loading.value = false;
           error.value = "Unable to load friends.";
         },
@@ -161,7 +162,7 @@ const sendRequest = async (inviteCode: string) => {
       toPhotoURL: profileMatch.photoURL ?? null,
     });
   } catch (err) {
-    console.error(err);
+    reportError(err, { flow: "friend.send", action: "request" });
     sendError.value =
       (err as Error).message || "Unable to send that request.";
     throw err;
@@ -183,7 +184,7 @@ const respond = async (friendship: FriendshipData, status: FriendshipStatus) => 
   try {
     await respondToFriendRequest(friendship.id, status);
   } catch (err) {
-    console.error(err);
+    reportError(err, { flow: "friend.respond", action: status });
     error.value = "Unable to update that request.";
   } finally {
     actionState.value = {

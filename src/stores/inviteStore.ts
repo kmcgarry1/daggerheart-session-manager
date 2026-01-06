@@ -11,6 +11,7 @@ import {
 } from "../services/invites";
 import { useAuthStore } from "./authStore";
 import { useSessionStore } from "./sessionStore";
+import { reportError, trackFlow } from "../monitoring";
 
 const authStore = useAuthStore();
 const invites = ref<InviteData[]>([]);
@@ -84,7 +85,7 @@ const init = () => {
           invites.value = nextInvites;
         },
         (error) => {
-          console.error(error);
+          reportError(error, { flow: "invite.subscribe", action: "invites" });
           invitesLoading.value = false;
           invitesError.value = "Unable to load invites.";
         },
@@ -96,7 +97,7 @@ const init = () => {
           profile.value = nextProfile;
         },
         (error) => {
-          console.error(error);
+          reportError(error, { flow: "invite.subscribe", action: "profile" });
           profileError.value = "Unable to load invite code.";
         },
       );
@@ -160,7 +161,7 @@ const sendInvite = async ({
       message,
     });
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "invite.send", action: "code" });
     sendInviteError.value =
       (error as Error).message || "Unable to send invite.";
     throw error;
@@ -205,7 +206,7 @@ const sendInviteToUid = async ({
       message,
     });
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "invite.send", action: "uid" });
     sendInviteError.value =
       (error as Error).message || "Unable to send invite.";
     throw error;
@@ -222,7 +223,7 @@ const respond = async (invite: InviteData, status: InviteStatus) => {
   try {
     await respondToInvite(invite.id, status);
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "invite.respond", action: status });
     invitesError.value = "Unable to update that invite.";
   } finally {
     inviteActionState.value = {
@@ -237,6 +238,7 @@ const acceptInvite = async (invite: InviteData) => {
   const sessionStore = useSessionStore();
   if (!authStore.isSignedIn.value) {
     invitesError.value = "Sign in to accept invites.";
+    trackFlow("invite.accept", "failure", { reason: "not_signed_in" });
     return;
   }
 
@@ -252,9 +254,12 @@ const acceptInvite = async (invite: InviteData) => {
       fallbackName: authStore.displayName.value,
     });
     await respondToInvite(invite.id, "accepted");
+    trackFlow("invite.accept", "success");
     return sessionId;
   } catch (error) {
-    console.error(error);
+    const code = (error as { code?: string }).code ?? null;
+    reportError(error, { flow: "invite.accept", action: "accept", code });
+    trackFlow("invite.accept", "failure", { code: code ?? "unknown" });
     invitesError.value =
       (error as Error).message || "Unable to join that session.";
     return null;

@@ -1,0 +1,199 @@
+title,body,labels
+"Authorize invites server-side (host-only + session validation)","Lead: Security
+Problem: Any signed-in user can create invites for any session because rules only check fromUid and status.
+Impact: Spoofed invites, spam, and disclosure of session codes and metadata.
+Evidence:
+- firestore.rules:235
+- src/stores/inviteStore.ts:127
+Acceptance criteria:
+- Enforce that fromUid is the host or a member with invite permissions for sessionId.
+- Validate sessionCode and sessionExpiresAt against the session document.
+- Add rules tests for allow and deny cases.","priority:P1,area:security"
+"Make session creation plus join code reservation atomic","Lead: Reliability
+Problem: Code reservation and session creation are separate writes with no transaction.
+Impact: Collisions or failures can leave orphan sessions or unusable codes under concurrency.
+Evidence:
+- src/services/sessions.ts:168
+- src/services/sessions.ts:203
+- src/services/sessions.ts:232
+Acceptance criteria:
+- Reserve the code and create the session in a single transaction or Cloud Function.
+- Roll back the session doc if code reservation fails.
+- Add retry with backoff for code collisions.","priority:P1,area:reliability"
+"Use crypto-grade RNG for join codes","Lead: Security
+Problem: Join codes are generated with Math.random, which is predictable.
+Impact: Increased risk of code guessing and session hijack.
+Evidence:
+- src/services/sessions.ts:123
+Acceptance criteria:
+- Use crypto.getRandomValues to generate codes.
+- Add tests for code format and length.","priority:P1,area:security"
+"Add join code rotation and refresh workflow","Lead: Product
+Problem: UI says code rotates but there is no way to refresh join codes after expiry.
+Impact: Hosts cannot add new players after 1 hour.
+Evidence:
+- src/views/SessionView.vue:295
+- src/services/sessions.ts:21
+Acceptance criteria:
+- Add a host action to regenerate join codes.
+- Update session and sessionCodes atomically and show the new expiry.
+- Invalidate the prior code.","priority:P1,area:product"
+"Allow invite-based joins after code expiry","Lead: Product
+Problem: Join rules require an unexpired join code and invites become unusable after 1 hour.
+Impact: Invited players cannot join active sessions.
+Evidence:
+- firestore.rules:158
+- src/stores/inviteStore.ts:235
+Acceptance criteria:
+- Allow join when a pending invite exists for the user and session is active.
+- Define an invite TTL separate from join code TTL.
+- Update UI copy to reflect invite validity.","priority:P2,area:product"
+"Ensure guest auth completion before using uid or memberId","Lead: Reliability
+Problem: ensureGuestAuth resolves before currentUser is set, but session flows read memberId and uid from currentUser.
+Impact: Intermittent failures creating or joining sessions on cold start.
+Evidence:
+- src/stores/authStore.ts:234
+- src/stores/sessionStore.ts:116
+- src/stores/sessionStore.ts:160
+Acceptance criteria:
+- Ensure ensureGuestAuth resolves only after currentUser is populated.
+- Or pass the returned credential user into session flows.
+- Add a regression test for create and join immediately after fresh load.","priority:P2,area:reliability"
+"Allow friendship re-request after decline or cancel","Lead: Product
+Problem: Once a friendship is declined or cancelled, rules block creating a new request for the same pair.
+Impact: Users cannot retry friend requests.
+Evidence:
+- firestore.rules:209
+- src/stores/friendStore.ts:141
+Acceptance criteria:
+- Allow reopening a friendship (update to pending) or allow delete and recreate.
+- Update UI messaging to match the allowed flow.","priority:P2,area:product"
+"Enforce unique invite codes","Lead: Data
+Problem: Invite codes are random with no uniqueness check.
+Impact: Collisions can route invites to the wrong user.
+Evidence:
+- src/services/users.ts:31
+- src/services/invites.ts:160
+Acceptance criteria:
+- Enforce uniqueness via transaction or Cloud Function.
+- Retry on collision and log collision rate.","priority:P2,area:data"
+"Add TTL and cleanup for sessionCodes, invites, friendships, saved sessions","Lead: Ops
+Problem: Only sessions have TTL documented and other collections are never cleaned up.
+Impact: Data bloat, cost growth, and join code exhaustion.
+Evidence:
+- README.md:26
+- firestore.rules:116
+Acceptance criteria:
+- Add TTL fields for sessionCodes, invites, friendships, and users/{uid}/sessions.
+- Document retention windows and cleanup behavior.","priority:P2,area:ops"
+"Use server time for expiry timestamps","Lead: Reliability
+Problem: Expiry timestamps are computed with Date.now on the client.
+Impact: Sessions may expire early or late due to clock skew.
+Evidence:
+- src/services/sessions.ts:195
+Acceptance criteria:
+- Compute expiry on server or use serverTimestamp plus TTL offset.
+- Add guardrails for skewed client clocks.","priority:P2,area:reliability"
+"Add field length and bounds validation in Firestore rules","Lead: Security
+Problem: Rules do not enforce max lengths or numeric bounds for user data.
+Impact: Large payload abuse, UI breaks, and higher read costs.
+Evidence:
+- firestore.rules:50
+- firestore.rules:76
+Acceptance criteria:
+- Add size limits for session names, host names, invite messages, and countdown names.
+- Enforce max countdown value and verify integer types.","priority:P2,area:security"
+"Enable App Check and throttling for join, invite, friend flows","Lead: Security
+Problem: No abuse protection or throttling for joins, invites, and friend requests.
+Impact: Brute force and spam risk at scale.
+Evidence:
+- src/services/sessions.ts:255
+- src/services/invites.ts:109
+Acceptance criteria:
+- Enable Firebase App Check for Firestore and Auth.
+- Add server-side throttling for invite and friend request creation.","priority:P2,area:security"
+"Cap countdown max to prevent oversized DOM","Lead: Performance
+Problem: Countdown max has no upper bound and renders one segment per tick.
+Impact: Large values create huge DOM and slow clients.
+Evidence:
+- src/services/sessions.ts:400
+- src/views/SessionView.vue:212
+Acceptance criteria:
+- Set a max countdown value in UI and Firestore rules.
+- Provide clear validation errors for out-of-range values.","priority:P2,area:performance"
+"Paginate or limit members and countdown subscriptions","Lead: Performance
+Problem: Members and countdowns are subscribed without limits.
+Impact: Large sessions increase Firestore reads and UI rendering cost.
+Evidence:
+- src/services/sessions.ts:337
+- src/services/sessions.ts:360
+Acceptance criteria:
+- Add pagination or limits or virtualized rendering.
+- Define and enforce max member and countdown counts.","priority:P2,area:performance"
+"Implement member heartbeat and stale cleanup","Lead: Product
+Problem: lastSeenAt is set only on join and never updated.
+Impact: Roster presence is stale and cannot prune inactive members.
+Evidence:
+- src/services/sessions.ts:302
+Acceptance criteria:
+- Add periodic heartbeat updates while in session.
+- Surface presence state and clean up stale member docs.","priority:P3,area:product"
+"Restore session when visiting /session/:id","Lead: UX
+Problem: Visiting /session/:id without an in-memory session shows a dead-end screen.
+Impact: Refreshing or sharing a session link fails to restore state.
+Evidence:
+- src/views/SessionView.vue:100
+- src/router.ts:19
+Acceptance criteria:
+- Attempt resume when sessionId is present.
+- If unauthorized, redirect to join or show recovery flow.","priority:P3,area:ux"
+"Add invite revoke and resend UI for hosts","Lead: Product
+Problem: Rules support revoked invites but the UI has no way to revoke or resend.
+Impact: Hosts cannot manage invite mistakes or spam.
+Evidence:
+- firestore.rules:254
+- src/stores/inviteStore.ts:117
+Acceptance criteria:
+- Add actions to revoke and resend invites for active sessions.
+- Reflect revoked status in the UI.","priority:P3,area:product"
+"Expose Apple sign-in in UI or remove from docs","Lead: Product
+Problem: Apple sign-in exists in code and README but there is no UI entry point.
+Impact: Feature mismatch and user confusion.
+Evidence:
+- src/services/auth.ts:64
+- README.md:8
+Acceptance criteria:
+- Add an Apple sign-in button or remove Apple references from docs and config.","priority:P3,area:product"
+"Gate auth diagnostics in production","Lead: Security
+Problem: Auth diagnostics are visible to all users.
+Impact: Exposes environment metadata in production.
+Evidence:
+- src/views/LoginView.vue:136
+Acceptance criteria:
+- Show diagnostics only in non-production builds or behind a feature flag.","priority:P3,area:security"
+"Add error tracking and operational telemetry","Lead: Ops
+Problem: Errors are only logged to console with no central monitoring.
+Impact: Incidents are hard to detect and diagnose at scale.
+Evidence:
+- src/stores/sessionStore.ts:79
+- src/stores/inviteStore.ts:163
+Acceptance criteria:
+- Integrate error tracking and alerting.
+- Track key flows and failure rates for auth, session create, and invite accept.","priority:P2,area:ops"
+"Add automated tests and CI","Lead: QA
+Problem: No automated tests or CI workflows are defined.
+Impact: Higher regression risk and slower feedback.
+Evidence:
+- package.json:6
+Acceptance criteria:
+- Add unit tests for stores, services, and Firestore rules.
+- Add a CI workflow to run build and tests on PRs.","priority:P2,area:qa"
+"Persist active session across refresh","Lead: UX
+Problem: activeSessionId is in-memory only and is lost on refresh.
+Impact: Users cannot return to an in-progress session after reload.
+Evidence:
+- src/stores/sessionStore.ts:20
+- src/App.vue:32
+Acceptance criteria:
+- Persist activeSessionId to localStorage and restore on app init.
+- Verify the session is still active before rejoining listeners.","priority:P3,area:ux"

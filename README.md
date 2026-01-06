@@ -17,7 +17,13 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 ```
 
-4) Deploy Firestore rules:
+4) (Optional) Enable error tracking with Sentry:
+
+```bash
+VITE_SENTRY_DSN=...
+```
+
+5) Deploy Firestore rules:
 
 ```bash
 firebase deploy --only firestore:rules

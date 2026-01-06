@@ -16,6 +16,7 @@ import {
   type UserSessionRecord,
 } from "../services/users";
 import { getGuestIdentity, getMemberId, setGuestName } from "../services/guests";
+import { reportError, trackFlow } from "../monitoring";
 
 const authReady = ref(false);
 const authBusy = ref(false);
@@ -90,9 +91,18 @@ const resolveAuthError = (error: unknown, fallback: string) => {
 };
 
 const setAuthError = (error: unknown, fallback: string) => {
-  authErrorCode.value = (error as { code?: string }).code ?? null;
+  authErrorCode.value = extractErrorCode(error);
   authError.value = resolveAuthError(error, fallback);
 };
+
+const extractErrorCode = (error: unknown) =>
+  (error as { code?: string }).code ?? null;
+
+const trackAuth = (
+  action: string,
+  status: "success" | "failure",
+  data?: Record<string, unknown>,
+) => trackFlow("auth", status, { action, ...data });
 
 const refreshSavedSessions = async () => {
   if (!currentUser.value || currentUser.value.isAnonymous) {
@@ -105,7 +115,7 @@ const refreshSavedSessions = async () => {
   try {
     savedSessions.value = await fetchUserSessions(currentUser.value.uid);
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "auth.sessions", action: "refresh" });
     savedSessionsError.value = "Unable to load saved sessions.";
   } finally {
     loadingSavedSessions.value = false;
@@ -130,7 +140,7 @@ const init = () => {
       }
     })
     .catch((error) => {
-      console.error(error);
+      reportError(error, { flow: "auth.redirect", action: "result" });
       setAuthError(error, "Sign-in failed. Please try again.");
     });
   authUnsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -145,7 +155,7 @@ const init = () => {
       try {
         await ensureUserProfile(user);
       } catch (error) {
-        console.error(error);
+        reportError(error, { flow: "auth.profile", action: "ensure" });
       }
       await refreshSavedSessions();
     } else {
@@ -160,8 +170,11 @@ const signIn = async () => {
   authErrorCode.value = null;
   try {
     await signInWithGoogle();
+    trackAuth("sign_in_google", "success");
   } catch (error) {
-    console.error(error);
+    const code = extractErrorCode(error);
+    reportError(error, { flow: "auth", action: "sign_in_google", code });
+    trackAuth("sign_in_google", "failure", { code: code ?? "unknown" });
     setAuthError(error, "Sign-in failed. Please try again.");
   } finally {
     authBusy.value = false;
@@ -174,8 +187,11 @@ const signInWithEmailAddress = async (email: string, password: string) => {
   authErrorCode.value = null;
   try {
     await signInWithEmail(email, password);
+    trackAuth("sign_in_email", "success");
   } catch (error) {
-    console.error(error);
+    const code = extractErrorCode(error);
+    reportError(error, { flow: "auth", action: "sign_in_email", code });
+    trackAuth("sign_in_email", "failure", { code: code ?? "unknown" });
     setAuthError(error, "Email sign-in failed. Please try again.");
   } finally {
     authBusy.value = false;
@@ -197,8 +213,11 @@ const signUpWithEmailAddress = async ({
   try {
     const user = await signUpWithEmail({ displayName: name, email, password });
     await ensureUserProfile(user);
+    trackAuth("sign_up_email", "success");
   } catch (error) {
-    console.error(error);
+    const code = extractErrorCode(error);
+    reportError(error, { flow: "auth", action: "sign_up_email", code });
+    trackAuth("sign_up_email", "failure", { code: code ?? "unknown" });
     setAuthError(error, "Account creation failed. Please try again.");
   } finally {
     authBusy.value = false;
@@ -211,8 +230,11 @@ const signOut = async () => {
   authErrorCode.value = null;
   try {
     await signOutUser();
+    trackAuth("sign_out", "success");
   } catch (error) {
-    console.error(error);
+    const code = extractErrorCode(error);
+    reportError(error, { flow: "auth", action: "sign_out", code });
+    trackAuth("sign_out", "failure", { code: code ?? "unknown" });
     setAuthError(error, "Sign-out failed. Please try again.");
   } finally {
     authBusy.value = false;
@@ -248,10 +270,13 @@ const ensureGuestAuth = async () => {
   guestAuthPromise = signInAnonymously()
     .then((credential) => {
       // Don't set currentUser or authReady here - let onAuthStateChanged handle it
+      trackAuth("sign_in_guest", "success");
       return credential.user;
     })
     .catch((error) => {
-      console.error(error);
+      const code = extractErrorCode(error);
+      reportError(error, { flow: "auth", action: "sign_in_guest", code });
+      trackAuth("sign_in_guest", "failure", { code: code ?? "unknown" });
       throw error;
     })
     .finally(() => {

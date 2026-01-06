@@ -10,6 +10,7 @@ import UiCard from "../components/ui/UiCard.vue";
 import UiField from "../components/ui/UiField.vue";
 import UiInput from "../components/ui/UiInput.vue";
 import UiPanelTitle from "../components/ui/UiPanelTitle.vue";
+import { reportError } from "../monitoring";
 import {
   CirclePlus,
   ClipboardCopy,
@@ -56,7 +57,7 @@ const handleCopyCode = async () => {
     await navigator.clipboard.writeText(session.value.code);
     copyStatus.value = "copied";
   } catch (error) {
-    console.error(error);
+    reportError(error, { flow: "clipboard", action: "copy_session_code" });
     copyStatus.value = "failed";
   } finally {
     window.setTimeout(() => {
