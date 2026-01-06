@@ -2033,6 +2033,16 @@ button.tracker-segment {
   border-color: rgba(var(--rgb-ember), 0.45);
 }
 
+.roster-badge.inactive {
+  background: rgba(200, 200, 200, 0.15);
+  border-color: rgba(200, 200, 200, 0.3);
+  color: rgba(200, 200, 200, 0.7);
+}
+
+.roster-item.is-inactive {
+  opacity: 0.6;
+}
+
 .invite-list,
 .invite-history {
   margin-top: 12px;
