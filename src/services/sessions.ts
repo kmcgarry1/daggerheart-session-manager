@@ -127,15 +127,20 @@ type CreateCountdownParams = {
 
 const generateJoinCode = () => {
   const chars = [];
-  const randomValues = new Uint32Array(CODE_LENGTH);
-  crypto.getRandomValues(randomValues);
+  const charsetLength = CODE_CHARSET.length;
+  
+  // Use rejection sampling to avoid modulo bias
+  const maxValid = Math.floor(256 / charsetLength) * charsetLength;
   
   for (let i = 0; i < CODE_LENGTH; i += 1) {
-    const randomValue = randomValues[i];
-    if (randomValue === undefined) {
-      throw new Error("Failed to generate random value");
-    }
-    const index = randomValue % CODE_CHARSET.length;
+    let randomValue: number;
+    do {
+      const randomBytes = new Uint8Array(1);
+      crypto.getRandomValues(randomBytes);
+      randomValue = randomBytes[0]!;
+    } while (randomValue >= maxValid);
+    
+    const index = randomValue % charsetLength;
     chars.push(CODE_CHARSET[index]);
   }
   return chars.join("");
