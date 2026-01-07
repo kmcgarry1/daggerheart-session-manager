@@ -131,13 +131,14 @@ const generateJoinCode = () => {
   
   // Use rejection sampling to avoid modulo bias
   const maxValid = Math.floor(256 / charsetLength) * charsetLength;
+  const randomBytes = new Uint8Array(1);
   
   for (let i = 0; i < CODE_LENGTH; i += 1) {
     let randomValue: number;
     do {
-      const randomBytes = new Uint8Array(1);
       crypto.getRandomValues(randomBytes);
-      randomValue = randomBytes[0]!;
+      // Type assertion is safe: crypto.getRandomValues always fills the array
+      randomValue = randomBytes[0] as number;
     } while (randomValue >= maxValid);
     
     const index = randomValue % charsetLength;
