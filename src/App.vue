@@ -16,6 +16,7 @@ const inviteStore = useInviteStore();
 const friendStore = useFriendStore();
 const themeStore = useThemeStore();
 authStore.init();
+sessionStore.init();
 inviteStore.init();
 friendStore.init();
 themeStore.init();
