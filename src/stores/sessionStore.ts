@@ -440,10 +440,12 @@ const attemptSessionRestore = async (sessionId: string) => {
     // Fetch the session to see if it exists and is valid
     const session = await fetchSessionById(sessionId);
     if (!session) {
+      sessionError.value = "Session not found.";
       return { success: false, requiresJoin: true, error: "Session not found." };
     }
 
     if (isExpired(session.sessionExpiresAt)) {
+      sessionError.value = "Session has expired.";
       return { success: false, requiresJoin: false, error: "Session has expired." };
     }
 
@@ -455,6 +457,14 @@ const attemptSessionRestore = async (sessionId: string) => {
       // User is already a member, restore the session
       activeSessionId.value = sessionId;
       activeSession.value = session;
+      
+      // Update heartbeat immediately to mark as active
+      try {
+        await updateMemberHeartbeat(sessionId, memberId);
+      } catch (error) {
+        console.error("Failed to update heartbeat on restore:", error);
+      }
+      
       startSessionListeners(sessionId);
       
       // Update saved session for signed-in users
@@ -480,6 +490,7 @@ const attemptSessionRestore = async (sessionId: string) => {
     };
   } catch (error) {
     reportError(error, { flow: "session.restore_url", action: "attempt" });
+    sessionError.value = "Unable to access session.";
     return { 
       success: false, 
       requiresJoin: false, 
