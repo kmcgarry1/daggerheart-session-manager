@@ -99,11 +99,16 @@ const handleAddCountdown = async () => {
 
 // Attempt to restore session when visiting a session URL
 const tryRestoreSession = async () => {
+  // Early exit checks
+  if (restoringSession.value) {
+    return; // Already attempting restoration
+  }
+  
   const id = sessionId.value;
-  if (!id || isActiveSession.value || restoringSession.value) {
+  if (!id || isActiveSession.value) {
     return;
   }
-
+  
   restoringSession.value = true;
   try {
     const result = await sessionStore.attemptSessionRestore(id);

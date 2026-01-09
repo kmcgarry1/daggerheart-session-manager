@@ -455,8 +455,7 @@ const attemptSessionRestore = async (sessionId: string) => {
 
     if (existingMember) {
       // User is already a member, restore the session
-      activeSessionId.value = sessionId;
-      activeSession.value = session;
+      // Don't update activeSession yet - startSessionListeners will do it via subscription
       
       // Update heartbeat immediately to mark as active
       try {
@@ -465,6 +464,9 @@ const attemptSessionRestore = async (sessionId: string) => {
         console.error("Failed to update heartbeat on restore:", error);
       }
       
+      // Set activeSessionId and start listeners
+      // activeSession will be set by the subscription callback in startSessionListeners
+      activeSessionId.value = sessionId;
       startSessionListeners(sessionId);
       
       // Update saved session for signed-in users
