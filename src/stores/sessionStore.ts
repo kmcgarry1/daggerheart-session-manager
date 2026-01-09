@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   HEARTBEAT_INTERVAL_MS,
   STALE_MEMBER_THRESHOLD_MS,
@@ -22,6 +22,7 @@ import {
 import { useAuthStore } from "./authStore";
 import { reportError, trackFlow } from "../monitoring";
 
+const ACTIVE_SESSION_KEY = "dh_active_session_id";
 const activeSessionId = ref<string | null>(null);
 const activeSession = ref<SessionData | null>(null);
 const countdowns = ref<CountdownData[]>([]);
@@ -35,6 +36,7 @@ let countdownUnsubscribe: (() => void) | null = null;
 let membersUnsubscribe: (() => void) | null = null;
 let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 let staleCleanupInterval: ReturnType<typeof setInterval> | null = null;
+let initialized = false;
 
 const isHost = computed(() => {
   const authStore = useAuthStore();
@@ -89,6 +91,29 @@ const resetSessionState = () => {
 };
 
 const isExpired = (date: Date) => date.getTime() <= Date.now();
+
+const getStoredSessionId = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const stored = localStorage.getItem(ACTIVE_SESSION_KEY);
+  if (!stored) {
+    return null;
+  }
+  const trimmed = stored.trim();
+  return trimmed ? trimmed : null;
+};
+
+const persistActiveSessionId = (sessionId: string | null) => {
+  if (typeof window === "undefined") {
+    return;
+  }
+  if (sessionId) {
+    localStorage.setItem(ACTIVE_SESSION_KEY, sessionId);
+  } else {
+    localStorage.removeItem(ACTIVE_SESSION_KEY);
+  }
+};
 
 const startSessionListeners = (sessionId: string) => {
   clearSubscriptions();
@@ -159,6 +184,57 @@ const startSessionListeners = (sessionId: string) => {
       }
     }
   }, HEARTBEAT_INTERVAL_MS);
+};
+
+const restoreActiveSession = async (sessionId: string) => {
+  sessionLoading.value = true;
+  sessionError.value = null;
+
+  try {
+    const session = await fetchSessionById(sessionId);
+    if (activeSessionId.value !== sessionId) {
+      return;
+    }
+    if (!session || isExpired(session.sessionExpiresAt)) {
+      clearSubscriptions();
+      resetSessionState();
+      return;
+    }
+
+    activeSession.value = session;
+    startSessionListeners(session.id);
+  } catch (error) {
+    if (activeSessionId.value !== sessionId) {
+      return;
+    }
+    reportError(error, { flow: "session.restore", action: "fetch" });
+    sessionError.value = "Unable to restore the session.";
+    sessionLoading.value = false;
+    activeSession.value = null;
+    countdowns.value = [];
+    members.value = [];
+  }
+};
+
+const init = () => {
+  if (initialized) {
+    return;
+  }
+  initialized = true;
+
+  const storedSessionId = getStoredSessionId();
+  if (storedSessionId) {
+    activeSessionId.value = storedSessionId;
+    void restoreActiveSession(storedSessionId);
+  }
+
+  watch(
+    activeSessionId,
+    (value) => {
+      persistActiveSessionId(value);
+    },
+    { immediate: true },
+  );
 };
 
 const createSessionFlow = async ({
@@ -446,6 +522,7 @@ export const useSessionStore = () => ({
   sessionLoading,
   countdownError,
   isHost,
+  init,
   createSessionFlow,
   joinSessionFlow,
   resumeSession,
