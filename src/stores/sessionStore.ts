@@ -5,6 +5,7 @@ import {
   addCountdown,
   createSession,
   fetchSessionById,
+  fetchMemberFromSession,
   findSessionByCode,
   joinSession,
   removeCountdown,
@@ -423,6 +424,72 @@ const resumeSession = async ({
   }
 };
 
+const attemptSessionRestore = async (sessionId: string) => {
+  // Don't attempt if we're already in this session
+  if (activeSessionId.value === sessionId) {
+    return { success: true, requiresJoin: false };
+  }
+
+  const authStore = useAuthStore();
+  sessionLoading.value = true;
+  sessionError.value = null;
+
+  try {
+    await authStore.ensureGuestAuth();
+    
+    // Fetch the session to see if it exists and is valid
+    const session = await fetchSessionById(sessionId);
+    if (!session) {
+      return { success: false, requiresJoin: true, error: "Session not found." };
+    }
+
+    if (isExpired(session.sessionExpiresAt)) {
+      return { success: false, requiresJoin: false, error: "Session has expired." };
+    }
+
+    // Check if user is already a member
+    const memberId = authStore.memberId.value;
+    const existingMember = await fetchMemberFromSession(sessionId, memberId);
+
+    if (existingMember) {
+      // User is already a member, restore the session
+      activeSessionId.value = sessionId;
+      activeSession.value = session;
+      startSessionListeners(sessionId);
+      
+      // Update saved session for signed-in users
+      if (authStore.isSignedIn.value) {
+        await authStore.recordSession({
+          sessionId: session.id,
+          code: session.code,
+          name: session.name,
+          role: existingMember.role,
+          codeExpiresAt: session.codeExpiresAt,
+          sessionExpiresAt: session.sessionExpiresAt,
+        });
+      }
+      
+      return { success: true, requiresJoin: false };
+    }
+
+    // User is not a member, they need to join
+    return { 
+      success: false, 
+      requiresJoin: true, 
+      sessionData: session,
+    };
+  } catch (error) {
+    reportError(error, { flow: "session.restore_url", action: "attempt" });
+    return { 
+      success: false, 
+      requiresJoin: false, 
+      error: "Unable to access session.",
+    };
+  } finally {
+    sessionLoading.value = false;
+  }
+};
+
 const leaveSession = () => {
   clearSubscriptions();
   resetSessionState();
@@ -526,6 +593,7 @@ export const useSessionStore = () => ({
   createSessionFlow,
   joinSessionFlow,
   resumeSession,
+  attemptSessionRestore,
   leaveSession,
   setFear,
   addSessionCountdown,

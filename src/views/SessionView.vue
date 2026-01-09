@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "../stores/authStore";
 import { useSessionStore } from "../stores/sessionStore";
@@ -32,6 +32,7 @@ const showCountdownForm = ref(false);
 const countdownName = ref("");
 const countdownMax = ref(6);
 const copyStatus = ref<"idle" | "copied" | "failed">("idle");
+const restoringSession = ref(false);
 
 const sessionId = computed(() => route.params.sessionId as string);
 const session = computed(() => sessionStore.activeSession.value);
@@ -95,18 +96,62 @@ const handleAddCountdown = async () => {
     showCountdownForm.value = false;
   }
 };
+
+// Attempt to restore session when visiting a session URL
+const tryRestoreSession = async () => {
+  const id = sessionId.value;
+  if (!id || isActiveSession.value || restoringSession.value) {
+    return;
+  }
+
+  restoringSession.value = true;
+  try {
+    const result = await sessionStore.attemptSessionRestore(id);
+    if (!result.success && result.requiresJoin) {
+      // User is not a member, redirect to join page
+      router.push("/join");
+    }
+  } catch (error) {
+    reportError(error, { flow: "session.view", action: "restore" });
+  } finally {
+    restoringSession.value = false;
+  }
+};
+
+// Watch for session ID changes in the route
+watch(sessionId, () => {
+  tryRestoreSession();
+});
+
+// Try to restore when component mounts
+onMounted(() => {
+  tryRestoreSession();
+});
 </script>
 
 <template>
   <main class="screen screen-wide session-screen">
     <UiCard v-if="!isActiveSession" as="section" variant="panel" wide>
-      <p class="eyebrow">No active session</p>
-      <h1>The hall is quiet.</h1>
-      <p class="lede">
+      <p v-if="restoringSession" class="eyebrow">Restoring session</p>
+      <p v-else-if="sessionStore.sessionError.value" class="eyebrow">Session error</p>
+      <p v-else class="eyebrow">No active session</p>
+      
+      <h1 v-if="restoringSession">Finding your way back...</h1>
+      <h1 v-else-if="sessionStore.sessionError.value">Unable to connect.</h1>
+      <h1 v-else>The hall is quiet.</h1>
+      
+      <p v-if="restoringSession" class="lede">
+        Checking if you have access to this session...
+      </p>
+      <p v-else-if="sessionStore.sessionError.value" class="error">
+        {{ sessionStore.sessionError.value }}
+      </p>
+      <p v-else class="lede">
         Join or create a session to enter. Once connected, the session will
         appear here automatically.
       </p>
-      <div class="cta-row">
+      
+      <div v-if="!restoringSession" class="cta-row">
         <UiButton variant="primary" to="/create">Host a session</UiButton>
         <UiButton variant="ghost" to="/join">Join a session</UiButton>
       </div>
