@@ -331,6 +331,19 @@ export const joinSession = async ({
   );
 };
 
+export const fetchMemberFromSession = async (
+  sessionId: string,
+  memberId: string,
+) => {
+  const memberDoc = await getDoc(
+    doc(db, SESSION_COLLECTION, sessionId, "members", memberId),
+  );
+  if (!memberDoc.exists()) {
+    return null;
+  }
+  return mapMemberData(memberDoc.id, memberDoc.data() as MemberDoc);
+};
+
 export const subscribeToSession = (
   sessionId: string,
   onChange: (session: SessionData | null) => void,
